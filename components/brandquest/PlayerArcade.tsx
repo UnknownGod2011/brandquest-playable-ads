@@ -215,7 +215,7 @@ function FilterSelect({
   options: { value: string; label: string }[]
 }) {
   return (
-    <Select value={value} onValueChange={onChange}>
+    <Select value={value} onValueChange={(v) => onChange(v ?? "all")}>
       <SelectTrigger className="h-9" aria-label={label}>
         <SelectValue placeholder={label} />
       </SelectTrigger>
