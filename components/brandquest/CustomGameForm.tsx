@@ -2,15 +2,17 @@
 
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
-import { ShieldCheck, Sparkles } from "lucide-react"
+import { ShieldCheck, Sparkles, Upload } from "lucide-react"
 import { toast } from "sonner"
 import type { CampaignCategory, ScoringType } from "@/lib/db/types"
 import { campaignCategories } from "@/lib/validation/campaign"
+import { customGameSubmissionSchema } from "@/lib/validation/custom-game"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { ThumbnailUploader } from "@/components/brandquest/ThumbnailUploader"
 import {
   Select,
   SelectContent,
@@ -74,45 +76,69 @@ export function CustomGameForm() {
     setForm((f) => ({ ...f, [key]: value }))
   }
 
-  function importJson() {
+  function applyImportedMetadata(data: Record<string, unknown>) {
+    const nextForm: FormState = {
+      ...form,
+      gameTitle: textValue(data.gameTitle ?? data.title, form.gameTitle),
+      brandName: textValue(data.brandName, form.brandName),
+      description: textValue(
+        data.previewText ?? data.description,
+        form.description,
+      ),
+      category: categoryValue(data.category, form.category),
+      thumbnailUrl: textValue(data.thumbnailUrl, form.thumbnailUrl),
+      instructions: textValue(
+        data.instructions ?? data.gameBrief,
+        form.instructions,
+      ),
+      scoringMethod: scoringValue(data.scoringMethod, form.scoringMethod),
+      expectedScoreMin: numberValue(data.expectedScoreMin, form.expectedScoreMin),
+      expectedScoreMax: numberValue(data.expectedScoreMax, form.expectedScoreMax),
+      maxPossibleScore: numberValue(data.maxPossibleScore, form.maxPossibleScore),
+      timeLimitSeconds: numberValue(data.timeLimitSeconds, form.timeLimitSeconds),
+      reward: textValue(data.reward ?? data.incentive ?? data.prize, form.reward),
+      rewardValue: numberValue(data.rewardValue ?? data.incentiveValue, form.rewardValue),
+      externalDemoUrl: textValue(data.externalDemoUrl, form.externalDemoUrl),
+      securityNotes: textValue(
+        data.securityNotes,
+        form.securityNotes || "Metadata-only submission. No uploaded JavaScript or executable code is included.",
+      ),
+    }
+    const parsed = customGameSubmissionSchema.safeParse(nextForm)
+    if (!parsed.success) {
+      setErrors(parsed.error.flatten().fieldErrors as Record<string, string[]>)
+      toast.error("Metadata was parsed, but some fields need review.")
+      return
+    }
+    setErrors({})
+    setForm(nextForm)
+    toast.success("Metadata imported. Review the fields before submitting.")
+  }
+
+  function importJsonText(text: string) {
     try {
-      const parsed = JSON.parse(jsonText) as unknown
+      const parsed = JSON.parse(text) as unknown
       if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
         toast.error("Paste a JSON object with custom game metadata.")
         return
       }
-      const data = parsed as Record<string, unknown>
-      setForm((current) => ({
-        ...current,
-        gameTitle: textValue(data.gameTitle ?? data.title, current.gameTitle),
-        brandName: textValue(data.brandName, current.brandName),
-        description: textValue(
-          data.previewText ?? data.description,
-          current.description,
-        ),
-        category: categoryValue(data.category, current.category),
-        thumbnailUrl: textValue(data.thumbnailUrl, current.thumbnailUrl),
-        instructions: textValue(
-          data.instructions ?? data.gameBrief,
-          current.instructions,
-        ),
-        scoringMethod: scoringValue(data.scoringMethod, current.scoringMethod),
-        expectedScoreMin: numberValue(data.expectedScoreMin, current.expectedScoreMin),
-        expectedScoreMax: numberValue(data.expectedScoreMax, current.expectedScoreMax),
-        maxPossibleScore: numberValue(data.maxPossibleScore, current.maxPossibleScore),
-        timeLimitSeconds: numberValue(data.timeLimitSeconds, current.timeLimitSeconds),
-        reward: textValue(data.reward ?? data.incentive ?? data.prize, current.reward),
-        rewardValue: numberValue(data.rewardValue ?? data.incentiveValue, current.rewardValue),
-        externalDemoUrl: textValue(data.externalDemoUrl, current.externalDemoUrl),
-        securityNotes: textValue(
-          data.securityNotes,
-          current.securityNotes || "Metadata-only submission. No uploaded JavaScript or executable code is included.",
-        ),
-      }))
-      toast.success("Metadata imported. Review the fields before submitting.")
+      applyImportedMetadata(parsed as Record<string, unknown>)
     } catch {
       toast.error("That JSON could not be parsed.")
     }
+  }
+
+  async function importJsonFile(file: File | undefined) {
+    if (!file) return
+    if (!file.name.toLowerCase().endsWith(".json") && file.type !== "application/json") {
+      toast.error("Upload a .json metadata file.")
+      return
+    }
+    if (file.size > 100 * 1024) {
+      toast.error("JSON metadata file must be under 100 KB.")
+      return
+    }
+    importJsonText(await file.text())
   }
 
   function submit() {
@@ -146,6 +172,21 @@ export function CustomGameForm() {
 
       <div className="grid gap-2 rounded-xl bg-secondary/40 p-4">
         <Label htmlFor="metadataJson">Import metadata JSON</Label>
+        <div className="flex flex-wrap items-center gap-2">
+          <Input
+            id="metadataFile"
+            type="file"
+            accept="application/json,.json"
+            className="max-w-sm"
+            onChange={(event) => {
+              void importJsonFile(event.target.files?.[0])
+              event.currentTarget.value = ""
+            }}
+          />
+          <span className="text-xs text-muted-foreground">
+            Upload `spotify-vibe-rush-custom-game.json` or paste it below.
+          </span>
+        </div>
         <Textarea
           id="metadataJson"
           value={jsonText}
@@ -154,7 +195,8 @@ export function CustomGameForm() {
           placeholder="Paste metadata-only JSON. Scripts are never executed."
         />
         <div className="flex justify-end">
-          <Button type="button" variant="outline" onClick={importJson}>
+          <Button type="button" variant="outline" onClick={() => importJsonText(jsonText)}>
+            <Upload className="size-4" aria-hidden="true" />
             Import JSON
           </Button>
         </div>
@@ -220,6 +262,13 @@ export function CustomGameForm() {
             placeholder="https://example.com/thumbnail.png"
           />
           <FieldError errors={errors.thumbnailUrl} />
+        </div>
+        <div className="sm:col-span-2">
+          <ThumbnailUploader
+            id="customThumbnailUpload"
+            value={form.thumbnailUrl}
+            onChange={(value) => update("thumbnailUrl", value)}
+          />
         </div>
         <div className="sm:col-span-2">
           <Label htmlFor="instructions">How to play</Label>

@@ -1,4 +1,5 @@
 import { cookies } from "next/headers"
+import { createHash } from "node:crypto"
 import { auth } from "@/auth"
 import { db } from "@/lib/db"
 import type { User, UserRole } from "@/lib/db/types"
@@ -11,17 +12,31 @@ function parseRole(value: string | undefined): UserRole | null {
   return null
 }
 
+function stableUserId(email: string): string {
+  return `user_${createHash("sha256").update(email.toLowerCase()).digest("hex").slice(0, 24)}`
+}
+
 export async function getCurrentUser(): Promise<User | null> {
   const session = await auth()
   const email = session?.user?.email
+  const store = await cookies()
+  const role = parseRole(store.get(AUTH_COOKIE)?.value)
+
   if (email) {
     const user = await db.getUserByEmail(email)
     if (user) return user
+    if (db.isPersistent && role && role !== "admin") {
+      return db.upsertUser({
+        userId: stableUserId(email),
+        email,
+        displayName: session.user?.name ?? email,
+        avatarUrl: session.user?.image ?? undefined,
+        requestedRole: role,
+      })
+    }
     if (db.isPersistent) return null
   }
 
-  const store = await cookies()
-  const role = parseRole(store.get(AUTH_COOKIE)?.value)
   if (!role || db.isPersistent) return null
 
   return {

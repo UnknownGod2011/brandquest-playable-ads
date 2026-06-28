@@ -1,14 +1,12 @@
 import type { Metadata } from "next"
 import Link from "next/link"
-import { Info, Mail } from "lucide-react"
+import { Info } from "lucide-react"
 import type { UserRole } from "@/lib/db/types"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Separator } from "@/components/ui/separator"
 import { Logo } from "@/components/brandquest/Logo"
-import { startAdminSignIn, startGoogleSignIn } from "@/lib/auth/actions"
+import { AdminCredentialsForm } from "@/components/brandquest/AdminCredentialsForm"
+import { startGoogleSignIn } from "@/lib/auth/actions"
 import { getAuthStatus } from "@/lib/auth/auth.config"
 
 export const metadata: Metadata = {
@@ -27,6 +25,7 @@ export default async function SignInPage({
     ? (role as UserRole)
     : "player"
   const auth = getAuthStatus()
+  const isAdmin = safeRole === "admin"
 
   return (
     <main className="relative flex min-h-dvh flex-col items-center justify-center px-4 py-12">
@@ -43,62 +42,26 @@ export default async function SignInPage({
         </div>
 
         <Card className="p-6">
-          <form action={startGoogleSignIn}>
-            <input type="hidden" name="role" value={safeRole} />
-            <Button
-              type="submit"
-              variant="outline"
-              className="w-full"
-              disabled={!auth.secretConfigured || !auth.googleConfigured}
-            >
-              <GoogleIcon />
-              Continue with Google
-            </Button>
-          </form>
+          {isAdmin ? (
+            <AdminCredentialsForm
+              enabled={auth.secretConfigured && auth.adminCredentialsConfigured}
+            />
+          ) : (
+            <form action={startGoogleSignIn}>
+              <input type="hidden" name="role" value={safeRole} />
+              <Button
+                type="submit"
+                variant="outline"
+                className="w-full"
+                disabled={!auth.secretConfigured || !auth.googleConfigured}
+              >
+                <GoogleIcon />
+                Continue with Google
+              </Button>
+            </form>
+          )}
 
-          <div className="my-4 flex items-center gap-3">
-            <Separator className="flex-1" />
-            <span className="text-xs text-muted-foreground">or</span>
-            <Separator className="flex-1" />
-          </div>
-
-          <form
-            action={safeRole === "admin" ? startAdminSignIn : undefined}
-            className="flex flex-col gap-4"
-          >
-            <div className="grid gap-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                placeholder={safeRole === "admin" ? "admin@brandquest.local" : "you@brand.com"}
-                autoComplete="email"
-                disabled={safeRole !== "admin" || !auth.adminCredentialsConfigured}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                name="password"
-                type="password"
-                placeholder="Password"
-                autoComplete="current-password"
-                disabled={safeRole !== "admin" || !auth.adminCredentialsConfigured}
-              />
-            </div>
-            <Button
-              type={safeRole === "admin" ? "submit" : "button"}
-              className="w-full"
-              disabled={safeRole !== "admin" || !auth.adminCredentialsConfigured}
-            >
-              <Mail className="size-4" aria-hidden="true" />
-              {safeRole === "admin" ? "Continue as admin" : "Email sign-in not configured"}
-            </Button>
-          </form>
-
-          {!auth.secretConfigured || (!auth.googleConfigured && safeRole !== "admin") ? (
+          {!auth.secretConfigured || (!auth.googleConfigured && !isAdmin) ? (
             <div className="mt-4 flex gap-2 rounded-lg bg-muted/50 p-3 text-xs leading-relaxed text-muted-foreground">
               <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
               <span>
@@ -111,7 +74,7 @@ export default async function SignInPage({
             </div>
           ) : null}
 
-          {safeRole === "admin" && !auth.adminCredentialsConfigured ? (
+          {isAdmin && !auth.adminCredentialsConfigured ? (
             <div className="mt-4 flex gap-2 rounded-lg bg-muted/50 p-3 text-xs leading-relaxed text-muted-foreground">
               <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
               <span>

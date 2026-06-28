@@ -46,25 +46,29 @@ if (adminCredentialsConfigured()) {
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        const email = String(credentials?.email ?? "").trim().toLowerCase()
-        const adminEmail = String(process.env.ADMIN_EMAIL ?? "").trim().toLowerCase()
-        const limit = rateLimit(`admin-auth:${email || "unknown"}`, 5, 60_000)
-        if (!limit.allowed || !email || email !== adminEmail) return null
-        if (!verifyAdminPassword(credentials?.password)) return null
+        try {
+          const email = String(credentials?.email ?? "").trim().toLowerCase()
+          const adminEmail = String(process.env.ADMIN_EMAIL ?? "").trim().toLowerCase()
+          const limit = rateLimit(`admin-auth:${email || "unknown"}`, 5, 60_000)
+          if (!limit.allowed || !email || email !== adminEmail) return null
+          if (!verifyAdminPassword(credentials?.password)) return null
 
-        const user = await db.upsertUser({
-          userId: "admin_brandquest",
-          email: adminEmail,
-          displayName: "BrandQuest Admin",
-          requestedRole: "admin",
-          allowAdmin: true,
-        })
+          const user = await db.upsertUser({
+            userId: "admin_brandquest",
+            email: adminEmail,
+            displayName: "BrandQuest Admin",
+            requestedRole: "admin",
+            allowAdmin: true,
+          })
 
-        return {
-          id: user.userId,
-          email: user.email,
-          name: user.displayName,
-          image: user.avatarUrl ?? null,
+          return {
+            id: user.userId,
+            email: user.email,
+            name: user.displayName,
+            image: user.avatarUrl ?? null,
+          }
+        } catch {
+          return null
         }
       },
     }),

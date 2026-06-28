@@ -10,7 +10,9 @@
 import { z } from "zod"
 import { campaignCategories } from "./campaign"
 
-const unsafeMetadataPattern = /<script|<\/script|javascript:|data:text\/html/i
+const unsafeMetadataPattern = /<script|<\/script|javascript:|data:text\/html|on\w+\s*=/i
+const safeImageDataUrlPattern = /^data:image\/(?:png|jpeg|jpg|webp);base64,[a-z0-9+/=]+$/i
+const maxThumbnailLength = 280_000
 
 function safeText(min: number, max: number, message: string) {
   return z
@@ -22,20 +24,43 @@ function safeText(min: number, max: number, message: string) {
     })
 }
 
+function safeImageRef() {
+  return z
+    .string()
+    .max(maxThumbnailLength, "Thumbnail is too large")
+    .refine((value) => {
+      if (value === "") return true
+      if (unsafeMetadataPattern.test(value)) return false
+      if (safeImageDataUrlPattern.test(value)) return true
+      try {
+        const url = new URL(value)
+        return url.protocol === "https:"
+      } catch {
+        return false
+      }
+    }, "Use a safe HTTPS image URL or a small PNG/JPEG/WebP upload")
+}
+
 export const customGameSubmissionSchema = z
   .object({
     gameTitle: safeText(3, 80, "Title must be at least 3 characters"),
-    brandName: safeText(2, 60, "Brand name is required").optional(),
-    description: z
-      .string()
-      .max(600)
-      .refine((value) => !unsafeMetadataPattern.test(value), {
-        message: "Executable script-like content is not allowed.",
-      })
-      .optional(),
+    brandName: z.preprocess(
+      (value) => (value === "" ? undefined : value),
+      safeText(2, 60, "Brand name is required").optional(),
+    ),
+    description: z.preprocess(
+      (value) => (value === "" ? undefined : value),
+      z
+        .string()
+        .max(600)
+        .refine((value) => !unsafeMetadataPattern.test(value), {
+          message: "Executable script-like content is not allowed.",
+        })
+        .optional(),
+    ),
     category: z.enum(campaignCategories).optional(),
     instructions: safeText(10, 800, "Explain how to play"),
-    thumbnailUrl: z.string().url("Enter a valid URL").or(z.literal("")).optional(),
+    thumbnailUrl: safeImageRef().optional(),
     expectedScoreMin: z.number().int().min(0),
     expectedScoreMax: z.number().int().min(1).max(1_000_000),
     scoringMethod: z.enum(["points", "time", "accuracy", "combo"]),

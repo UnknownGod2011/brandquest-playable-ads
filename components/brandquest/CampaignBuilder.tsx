@@ -45,6 +45,7 @@ import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { ThumbnailUploader } from "@/components/brandquest/ThumbnailUploader"
 import {
   Select,
   SelectContent,
@@ -404,6 +405,13 @@ function DetailsStep({
             placeholder="https://example.com/campaign.png"
           />
           <FieldError errors={errors.thumbnailUrl} />
+        </div>
+        <div className="sm:col-span-2">
+          <ThumbnailUploader
+            id="campaignThumbnailUpload"
+            value={form.thumbnailUrl ?? ""}
+            onChange={(value) => update("thumbnailUrl", value)}
+          />
         </div>
         <div>
           <Label htmlFor="brand">Brand name</Label>

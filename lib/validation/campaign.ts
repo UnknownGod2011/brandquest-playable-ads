@@ -8,7 +8,9 @@
 
 import { z } from "zod"
 
-const unsafeCampaignPattern = /<script|<\/script|javascript:|data:text\/html/i
+const unsafeCampaignPattern = /<script|<\/script|javascript:|data:text\/html|on\w+\s*=/i
+const safeImageDataUrlPattern = /^data:image\/(?:png|jpeg|jpg|webp);base64,[a-z0-9+/=]+$/i
+const maxThumbnailLength = 280_000
 
 function safeText(min: number, max: number, message: string) {
   return z
@@ -28,6 +30,23 @@ function safeOptionalText(max: number) {
       message: "Executable script-like content is not allowed.",
     })
     .optional()
+}
+
+function safeImageRef() {
+  return z
+    .string()
+    .max(maxThumbnailLength, "Thumbnail is too large")
+    .refine((value) => {
+      if (value === "") return true
+      if (unsafeCampaignPattern.test(value)) return false
+      if (safeImageDataUrlPattern.test(value)) return true
+      try {
+        const url = new URL(value)
+        return url.protocol === "https:"
+      } catch {
+        return false
+      }
+    }, "Use a safe HTTPS image URL or a small PNG/JPEG/WebP upload")
 }
 
 export const campaignCategories = [
@@ -85,7 +104,7 @@ export const templateConfigSchema = z.object({
   successMessage: safeOptionalText(280),
   rewardMessage: safeOptionalText(280),
   brandColor: z.string().max(32).optional(),
-  logoUrl: z.string().url().optional().or(z.literal("")),
+  logoUrl: safeImageRef().optional(),
   minDurationSeconds: z.number().int().min(0).max(600).optional(),
   maxScorePerSecond: z.number().min(0).max(100_000).optional(),
   questions: z.array(quizQuestionSchema).optional(),
@@ -121,7 +140,7 @@ export const createCampaignSchema = z
     maxAttemptsPerPlayer: z.number().int().min(1).max(100),
     eligibilityRules: safeOptionalText(600).default(""),
     brandLink: z.string().url("Enter a valid URL").or(z.literal("")),
-    thumbnailUrl: z.string().url("Enter a valid URL").optional().or(z.literal("")),
+    thumbnailUrl: safeImageRef().optional(),
     templateType: z.enum(templateTypes),
     isCustom: z.boolean().default(false),
     customSubmissionId: z.string().optional(),
