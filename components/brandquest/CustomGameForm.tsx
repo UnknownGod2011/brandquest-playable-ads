@@ -4,7 +4,8 @@ import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { ShieldCheck, Sparkles } from "lucide-react"
 import { toast } from "sonner"
-import type { ScoringType } from "@/lib/db/types"
+import type { CampaignCategory, ScoringType } from "@/lib/db/types"
+import { campaignCategories } from "@/lib/validation/campaign"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -23,6 +24,10 @@ const scoringMethods: ScoringType[] = ["points", "time", "accuracy", "combo"]
 
 interface FormState {
   gameTitle: string
+  brandName: string
+  description: string
+  category: CampaignCategory
+  thumbnailUrl: string
   instructions: string
   expectedScoreMin: number
   expectedScoreMax: number
@@ -30,12 +35,17 @@ interface FormState {
   maxPossibleScore: number
   timeLimitSeconds: number
   reward: string
+  rewardValue: number
   externalDemoUrl: string
   securityNotes: string
 }
 
 const initial: FormState = {
   gameTitle: "",
+  brandName: "",
+  description: "",
+  category: "tech",
+  thumbnailUrl: "",
   instructions: "",
   expectedScoreMin: 0,
   expectedScoreMax: 1000,
@@ -43,6 +53,7 @@ const initial: FormState = {
   maxPossibleScore: 1000,
   timeLimitSeconds: 60,
   reward: "",
+  rewardValue: 0,
   externalDemoUrl: "",
   securityNotes: "",
 }
@@ -55,11 +66,53 @@ function FieldError({ errors }: { errors?: string[] }) {
 export function CustomGameForm() {
   const router = useRouter()
   const [form, setForm] = useState<FormState>(initial)
+  const [jsonText, setJsonText] = useState("")
   const [errors, setErrors] = useState<Record<string, string[]>>({})
   const [isPending, startTransition] = useTransition()
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((f) => ({ ...f, [key]: value }))
+  }
+
+  function importJson() {
+    try {
+      const parsed = JSON.parse(jsonText) as unknown
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        toast.error("Paste a JSON object with custom game metadata.")
+        return
+      }
+      const data = parsed as Record<string, unknown>
+      setForm((current) => ({
+        ...current,
+        gameTitle: textValue(data.gameTitle ?? data.title, current.gameTitle),
+        brandName: textValue(data.brandName, current.brandName),
+        description: textValue(
+          data.previewText ?? data.description,
+          current.description,
+        ),
+        category: categoryValue(data.category, current.category),
+        thumbnailUrl: textValue(data.thumbnailUrl, current.thumbnailUrl),
+        instructions: textValue(
+          data.instructions ?? data.gameBrief,
+          current.instructions,
+        ),
+        scoringMethod: scoringValue(data.scoringMethod, current.scoringMethod),
+        expectedScoreMin: numberValue(data.expectedScoreMin, current.expectedScoreMin),
+        expectedScoreMax: numberValue(data.expectedScoreMax, current.expectedScoreMax),
+        maxPossibleScore: numberValue(data.maxPossibleScore, current.maxPossibleScore),
+        timeLimitSeconds: numberValue(data.timeLimitSeconds, current.timeLimitSeconds),
+        reward: textValue(data.reward ?? data.incentive ?? data.prize, current.reward),
+        rewardValue: numberValue(data.rewardValue ?? data.incentiveValue, current.rewardValue),
+        externalDemoUrl: textValue(data.externalDemoUrl, current.externalDemoUrl),
+        securityNotes: textValue(
+          data.securityNotes,
+          current.securityNotes || "Metadata-only submission. No uploaded JavaScript or executable code is included.",
+        ),
+      }))
+      toast.success("Metadata imported. Review the fields before submitting.")
+    } catch {
+      toast.error("That JSON could not be parsed.")
+    }
   }
 
   function submit() {
@@ -91,6 +144,22 @@ export function CustomGameForm() {
         </div>
       </div>
 
+      <div className="grid gap-2 rounded-xl bg-secondary/40 p-4">
+        <Label htmlFor="metadataJson">Import metadata JSON</Label>
+        <Textarea
+          id="metadataJson"
+          value={jsonText}
+          onChange={(e) => setJsonText(e.target.value)}
+          rows={4}
+          placeholder="Paste metadata-only JSON. Scripts are never executed."
+        />
+        <div className="flex justify-end">
+          <Button type="button" variant="outline" onClick={importJson}>
+            Import JSON
+          </Button>
+        </div>
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="sm:col-span-2">
           <Label htmlFor="title">Game title</Label>
@@ -101,6 +170,56 @@ export function CustomGameForm() {
             placeholder="e.g. Pixel Quest by Arcadia"
           />
           <FieldError errors={errors.gameTitle} />
+        </div>
+        <div>
+          <Label htmlFor="brandName">Brand name</Label>
+          <Input
+            id="brandName"
+            value={form.brandName}
+            onChange={(e) => update("brandName", e.target.value)}
+            placeholder="Your brand"
+          />
+          <FieldError errors={errors.brandName} />
+        </div>
+        <div>
+          <Label>Category</Label>
+          <Select
+            value={form.category}
+            onValueChange={(v) => update("category", (v ?? "tech") as CampaignCategory)}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {campaignCategories.map((category) => (
+                <SelectItem key={category} value={category}>
+                  {category.replaceAll("_", " ")}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <FieldError errors={errors.category} />
+        </div>
+        <div className="sm:col-span-2">
+          <Label htmlFor="description">Description</Label>
+          <Textarea
+            id="description"
+            value={form.description}
+            onChange={(e) => update("description", e.target.value)}
+            rows={3}
+            placeholder="Describe the branded experience and reward context."
+          />
+          <FieldError errors={errors.description} />
+        </div>
+        <div className="sm:col-span-2">
+          <Label htmlFor="thumbnail">Thumbnail URL or placeholder</Label>
+          <Input
+            id="thumbnail"
+            value={form.thumbnailUrl}
+            onChange={(e) => update("thumbnailUrl", e.target.value)}
+            placeholder="https://example.com/thumbnail.png"
+          />
+          <FieldError errors={errors.thumbnailUrl} />
         </div>
         <div className="sm:col-span-2">
           <Label htmlFor="instructions">How to play</Label>
@@ -186,6 +305,16 @@ export function CustomGameForm() {
           />
           <FieldError errors={errors.reward} />
         </div>
+        <div>
+          <Label htmlFor="rewardValue">Reward value</Label>
+          <Input
+            id="rewardValue"
+            type="number"
+            value={form.rewardValue}
+            onChange={(e) => update("rewardValue", Number(e.target.value))}
+          />
+          <FieldError errors={errors.rewardValue} />
+        </div>
 
         <div className="sm:col-span-2">
           <Label htmlFor="demo">Demo URL</Label>
@@ -218,4 +347,30 @@ export function CustomGameForm() {
       </div>
     </Card>
   )
+}
+
+function textValue(value: unknown, fallback = ""): string {
+  return typeof value === "string" ? value.slice(0, 800) : fallback
+}
+
+function numberValue(value: unknown, fallback: number): number {
+  if (typeof value === "number" && Number.isFinite(value)) return value
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value)
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return fallback
+}
+
+function categoryValue(value: unknown, fallback: CampaignCategory): CampaignCategory {
+  return typeof value === "string" &&
+    campaignCategories.includes(value as CampaignCategory)
+    ? (value as CampaignCategory)
+    : fallback
+}
+
+function scoringValue(value: unknown, fallback: ScoringType): ScoringType {
+  return typeof value === "string" && scoringMethods.includes(value as ScoringType)
+    ? (value as ScoringType)
+    : fallback
 }

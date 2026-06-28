@@ -8,24 +8,48 @@
  */
 
 import { z } from "zod"
+import { campaignCategories } from "./campaign"
+
+const unsafeMetadataPattern = /<script|<\/script|javascript:|data:text\/html/i
+
+function safeText(min: number, max: number, message: string) {
+  return z
+    .string()
+    .min(min, message)
+    .max(max)
+    .refine((value) => !unsafeMetadataPattern.test(value), {
+      message: "Executable script-like content is not allowed.",
+    })
+}
 
 export const customGameSubmissionSchema = z
   .object({
-    gameTitle: z.string().min(3, "Title must be at least 3 characters").max(80),
-    instructions: z.string().min(10, "Explain how to play").max(800),
-    thumbnailUrl: z.string().optional(),
+    gameTitle: safeText(3, 80, "Title must be at least 3 characters"),
+    brandName: safeText(2, 60, "Brand name is required").optional(),
+    description: z
+      .string()
+      .max(600)
+      .refine((value) => !unsafeMetadataPattern.test(value), {
+        message: "Executable script-like content is not allowed.",
+      })
+      .optional(),
+    category: z.enum(campaignCategories).optional(),
+    instructions: safeText(10, 800, "Explain how to play"),
+    thumbnailUrl: z.string().url("Enter a valid URL").or(z.literal("")).optional(),
     expectedScoreMin: z.number().int().min(0),
     expectedScoreMax: z.number().int().min(1).max(1_000_000),
     scoringMethod: z.enum(["points", "time", "accuracy", "combo"]),
     maxPossibleScore: z.number().int().min(1).max(1_000_000),
     timeLimitSeconds: z.number().int().min(5).max(3600),
-    reward: z.string().min(2, "Describe the reward").max(120),
+    reward: safeText(2, 120, "Describe the reward"),
+    rewardValue: z.number().min(0).max(1_000_000).optional(),
     // External demo URL or an uploaded-package placeholder. No code is executed.
     externalDemoUrl: z.string().url("Enter a valid URL").or(z.literal("")),
-    securityNotes: z
-      .string()
-      .min(10, "Describe data captured and any third-party calls")
-      .max(800),
+    securityNotes: safeText(
+      10,
+      800,
+      "Describe data captured and any third-party calls",
+    ),
   })
   .refine((d) => d.expectedScoreMax >= d.expectedScoreMin, {
     message: "Max expected score must be greater than min",

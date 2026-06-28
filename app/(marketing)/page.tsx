@@ -1,6 +1,5 @@
 import Link from "next/link"
 import {
-  ArrowRight,
   BarChart3,
   Gamepad2,
   Rocket,
@@ -34,7 +33,6 @@ export default function MarketingPage() {
         <BrandsSection />
         <WhySection />
         <SafetySection />
-        <PlatformSection />
         <FinalCta />
       </main>
 
@@ -290,54 +288,6 @@ function SafetySection() {
           ))}
         </div>
       </div>
-    </section>
-  )
-}
-
-function PlatformSection() {
-  return (
-    <section className="mx-auto w-full max-w-6xl px-4 py-16">
-      <Card className="overflow-hidden p-0">
-        <div className="grid items-center gap-8 p-8 md:grid-cols-2 md:p-12">
-          <div>
-            <Badge variant="outline" className="border-accent/40 text-accent">
-              Infrastructure
-            </Badge>
-            <h2 className="mt-3 text-balance text-3xl font-bold tracking-tight">
-              Built for Vercel + Amazon DynamoDB
-            </h2>
-            <p className="mt-3 text-pretty leading-relaxed text-muted-foreground">
-              A Vercel-hosted Next.js frontend with server-side validation, and
-              Amazon DynamoDB for high-volume game attempts, leaderboards, reward
-              claims, and analytics events.
-            </p>
-            <Button
-              render={<Link href="/architecture" />}
-              variant="outline"
-              className="mt-6"
-            >
-              View the architecture
-              <ArrowRight className="size-4" aria-hidden="true" />
-            </Button>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            {[
-              { k: "Frontend", v: "Next.js on Vercel" },
-              { k: "Database", v: "Amazon DynamoDB" },
-              { k: "Validation", v: "Server-side anti-cheat" },
-              { k: "Analytics", v: "Event-sourced metrics" },
-            ].map((item) => (
-              <div
-                key={item.k}
-                className="rounded-xl bg-background/60 p-4 ring-1 ring-foreground/10"
-              >
-                <div className="text-xs text-muted-foreground">{item.k}</div>
-                <div className="mt-1 text-sm font-semibold">{item.v}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </Card>
     </section>
   )
 }

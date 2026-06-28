@@ -2,11 +2,9 @@ import { notFound } from "next/navigation"
 import Link from "next/link"
 import { ArrowLeft, Gamepad2 } from "lucide-react"
 import { db } from "@/lib/db"
-import { getSampleCampaign } from "@/lib/game-engine/sample-campaigns"
 import { LeaderboardTable } from "@/components/brandquest/LeaderboardTable"
 import { RewardBadge } from "@/components/brandquest/RewardBadge"
 import { Button } from "@/components/ui/button"
-import type { Campaign } from "@/lib/db/types"
 
 export default async function GameLeaderboardPage({
   params,
@@ -14,12 +12,9 @@ export default async function GameLeaderboardPage({
   params: Promise<{ campaignId: string }>
 }) {
   const { campaignId } = await params
-
-  let campaign: Campaign | null = await db.getCampaign(campaignId)
-  if (!campaign) campaign = getSampleCampaign(campaignId) ?? null
+  const campaign = await db.getCampaign(campaignId)
   if (!campaign) notFound()
 
-  // Real leaderboard reads through the adapter; empty until DynamoDB is wired.
   const entries = await db.getLeaderboard(campaignId, 100)
 
   return (
@@ -39,7 +34,7 @@ export default async function GameLeaderboardPage({
             {campaign.title}
           </h1>
           <p className="text-sm text-muted-foreground">
-            Leaderboard · top {campaign.numberOfWinners} win the reward
+            Leaderboard - top {campaign.numberOfWinners} win the reward
           </p>
         </div>
         <RewardBadge reward={campaign.reward} />

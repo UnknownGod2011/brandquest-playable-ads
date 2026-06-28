@@ -7,9 +7,20 @@ __v0_jsx-dev-runtime.ts
 .vercel/
 
 # Environment variables
+.env
+.env.local
 .env*.local
+.env.vercel-oidc.local.backup
+.enc.local
+MISSING_ENV_KEYS.txt
+vercel-env-to-add.txt
+ADMIN_CREDENTIALS.local.txt
 
 # Common ignores
 node_modules
 .next/
+tsconfig.tsbuildinfo
 .DS_Store
+
+.vercel
+.env*.local

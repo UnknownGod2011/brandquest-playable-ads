@@ -9,8 +9,6 @@ import {
 } from "@/lib/validation/campaign"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
 import {
   Select,
   SelectContent,
@@ -26,24 +24,17 @@ type SortKey = "newest" | "ending_soon" | "most_played" | "highest_reward"
 
 interface PlayerArcadeProps {
   liveCampaigns: Campaign[]
-  sampleCampaigns: Campaign[]
 }
 
-export function PlayerArcade({
-  liveCampaigns,
-  sampleCampaigns,
-}: PlayerArcadeProps) {
+export function PlayerArcade({ liveCampaigns }: PlayerArcadeProps) {
   const [search, setSearch] = useState("")
   const [sort, setSort] = useState<SortKey>("newest")
   const [category, setCategory] = useState<string>("all")
   const [difficulty, setDifficulty] = useState<string>("all")
   const [kind, setKind] = useState<string>("all")
-  const [showSamples, setShowSamples] = useState(false)
-
-  const source = showSamples ? sampleCampaigns : liveCampaigns
 
   const filtered = useMemo(() => {
-    let list = [...source]
+    let list = [...liveCampaigns]
 
     if (search.trim()) {
       const q = search.toLowerCase()
@@ -82,7 +73,7 @@ export function PlayerArcade({
         )
     }
     return list
-  }, [source, search, category, difficulty, kind, sort])
+  }, [liveCampaigns, search, category, difficulty, kind, sort])
 
   return (
     <section className="space-y-5">
@@ -146,48 +137,28 @@ export function PlayerArcade({
             ]}
           />
 
-          <div className="ml-auto flex items-center gap-2 rounded-lg bg-card px-3 py-2 ring-1 ring-foreground/10">
-            <Switch
-              id="samples"
-              checked={showSamples}
-              onCheckedChange={setShowSamples}
-            />
-            <Label htmlFor="samples" className="cursor-pointer text-xs">
-              Preview sample campaigns
-            </Label>
-          </div>
+          <div className="ml-auto" />
         </div>
       </div>
 
       {/* Grid / empty states */}
       {filtered.length === 0 ? (
-        showSamples ? (
-          <EmptyState
-            icon={Gamepad2}
-            title="No samples match your filters"
-            description="Try clearing filters to see all sample campaigns."
-            action={
+        <EmptyState
+          icon={Gamepad2}
+          title="No live campaigns yet"
+          description="There are no live campaigns to play right now. When creators publish campaigns, they will appear here."
+          action={
+            liveCampaigns.length > 0 ? (
               <Button variant="outline" onClick={() => resetFilters()}>
                 Clear filters
               </Button>
-            }
-          />
-        ) : (
-          <EmptyState
-            icon={Gamepad2}
-            title="No live campaigns yet"
-            description="There are no live campaigns to play right now. Connect DynamoDB to load real campaigns, or flip on 'Preview sample campaigns' to explore the arcade."
-            action={
-              <Button onClick={() => setShowSamples(true)}>
-                Preview sample campaigns
-              </Button>
-            }
-          />
-        )
+            ) : null
+          }
+        />
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((c) => (
-            <GameCard key={c.campaignId} campaign={c} sample={showSamples} />
+            <GameCard key={c.campaignId} campaign={c} />
           ))}
         </div>
       )}

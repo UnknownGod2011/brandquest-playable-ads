@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import Link from "next/link"
-import { ArrowRight, Info, Mail } from "lucide-react"
+import { Info, Mail } from "lucide-react"
 import type { UserRole } from "@/lib/db/types"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -8,11 +8,11 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Logo } from "@/components/brandquest/Logo"
-import { completeSignIn } from "@/lib/auth/actions"
+import { startAdminSignIn, startGoogleSignIn } from "@/lib/auth/actions"
 import { getAuthStatus } from "@/lib/auth/auth.config"
 
 export const metadata: Metadata = {
-  title: "Sign in — BrandQuest",
+  title: "Sign in - BrandQuest",
 }
 
 const VALID: UserRole[] = ["player", "creator", "admin"]
@@ -43,15 +43,18 @@ export default async function SignInPage({
         </div>
 
         <Card className="p-6">
-          {/* Google sign-in (prepared) */}
-          <Button
-            variant="outline"
-            className="w-full"
-            disabled={!auth.googleConfigured}
-          >
-            <GoogleIcon />
-            Continue with Google
-          </Button>
+          <form action={startGoogleSignIn}>
+            <input type="hidden" name="role" value={safeRole} />
+            <Button
+              type="submit"
+              variant="outline"
+              className="w-full"
+              disabled={!auth.secretConfigured || !auth.googleConfigured}
+            >
+              <GoogleIcon />
+              Continue with Google
+            </Button>
+          </form>
 
           <div className="my-4 flex items-center gap-3">
             <Separator className="flex-1" />
@@ -59,17 +62,19 @@ export default async function SignInPage({
             <Separator className="flex-1" />
           </div>
 
-          {/* Email form (prepared) + continue action */}
-          <form action={completeSignIn} className="flex flex-col gap-4">
-            <input type="hidden" name="role" value={safeRole} />
+          <form
+            action={safeRole === "admin" ? startAdminSignIn : undefined}
+            className="flex flex-col gap-4"
+          >
             <div className="grid gap-2">
               <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
                 name="email"
                 type="email"
-                placeholder="you@brand.com"
+                placeholder={safeRole === "admin" ? "admin@brandquest.local" : "you@brand.com"}
                 autoComplete="email"
+                disabled={safeRole !== "admin" || !auth.adminCredentialsConfigured}
               />
             </div>
             <div className="grid gap-2">
@@ -78,27 +83,42 @@ export default async function SignInPage({
                 id="password"
                 name="password"
                 type="password"
-                placeholder="••••••••"
+                placeholder="Password"
                 autoComplete="current-password"
+                disabled={safeRole !== "admin" || !auth.adminCredentialsConfigured}
               />
             </div>
-            <Button type="submit" className="w-full">
+            <Button
+              type={safeRole === "admin" ? "submit" : "button"}
+              className="w-full"
+              disabled={safeRole !== "admin" || !auth.adminCredentialsConfigured}
+            >
               <Mail className="size-4" aria-hidden="true" />
-              Continue
-              <ArrowRight className="size-4" aria-hidden="true" />
+              {safeRole === "admin" ? "Continue as admin" : "Email sign-in not configured"}
             </Button>
           </form>
 
-          {!auth.enabled ? (
+          {!auth.secretConfigured || (!auth.googleConfigured && safeRole !== "admin") ? (
             <div className="mt-4 flex gap-2 rounded-lg bg-muted/50 p-3 text-xs leading-relaxed text-muted-foreground">
               <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
               <span>
-                Auth runs in prepared mode. Add{" "}
-                <code className="text-foreground">AUTH_SECRET</code>,{" "}
+                Add <code className="text-foreground">AUTH_SECRET</code>,{" "}
                 <code className="text-foreground">GOOGLE_CLIENT_ID</code>, and{" "}
                 <code className="text-foreground">GOOGLE_CLIENT_SECRET</code> to
-                enable real sign-in. Continuing starts a safe role session
-                without storing credentials.
+                enable real Google sign-in. Email sign-in is disabled until an
+                email provider is configured.
+              </span>
+            </div>
+          ) : null}
+
+          {safeRole === "admin" && !auth.adminCredentialsConfigured ? (
+            <div className="mt-4 flex gap-2 rounded-lg bg-muted/50 p-3 text-xs leading-relaxed text-muted-foreground">
+              <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+              <span>
+                Add <code className="text-foreground">ADMIN_EMAIL</code>,{" "}
+                <code className="text-foreground">ADMIN_PASSWORD_HASH</code>, and{" "}
+                <code className="text-foreground">ADMIN_PASSWORD_SALT</code> to
+                enable reviewer access.
               </span>
             </div>
           ) : null}

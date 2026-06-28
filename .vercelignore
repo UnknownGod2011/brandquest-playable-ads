@@ -1,0 +1,12 @@
+.env
+.env.local
+.env*.local
+.env.vercel-oidc.local.backup
+.enc.local
+ADMIN_CREDENTIALS.local.txt
+MISSING_ENV_KEYS.txt
+vercel-env-to-add.txt
+.vercel
+.next
+node_modules
+tsconfig.tsbuildinfo

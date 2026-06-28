@@ -10,8 +10,6 @@ import { WinnerRibbon } from "./WinnerRibbon"
 interface GameCardProps {
   campaign: Campaign
   won?: boolean
-  /** Sample cards are visually marked as previews, not real live campaigns. */
-  sample?: boolean
 }
 
 const difficultyStyles: Record<string, string> = {
@@ -20,7 +18,7 @@ const difficultyStyles: Record<string, string> = {
   hard: "text-reward",
 }
 
-export function GameCard({ campaign, won, sample }: GameCardProps) {
+export function GameCard({ campaign, won }: GameCardProps) {
   const playHref = `/player/games/${campaign.campaignId}`
   const leaderboardHref = `/player/games/${campaign.campaignId}/leaderboard`
 
@@ -46,7 +44,7 @@ export function GameCard({ campaign, won, sample }: GameCardProps) {
         {/* Title top-left */}
         <div className="absolute left-3 top-3 max-w-[70%]">
           <h3 className="text-pretty text-sm font-bold leading-tight drop-shadow">
-            {campaign.title}
+            {campaign.previewTitle || campaign.title}
           </h3>
         </div>
 
@@ -63,14 +61,6 @@ export function GameCard({ campaign, won, sample }: GameCardProps) {
           <RewardBadge reward={campaign.reward} size="sm" className="glow-reward" />
         </div>
 
-        {sample ? (
-          <Badge
-            variant="outline"
-            className="absolute bottom-3 left-3 border-border/60 bg-background/70 backdrop-blur"
-          >
-            Sample
-          </Badge>
-        ) : null}
       </div>
 
       {/* Body */}
@@ -81,6 +71,12 @@ export function GameCard({ campaign, won, sample }: GameCardProps) {
           </span>
           <span className="truncate">{humanize(campaign.category)}</span>
         </div>
+
+        {campaign.previewText || campaign.description ? (
+          <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">
+            {campaign.previewText || campaign.description}
+          </p>
+        ) : null}
 
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
           <span className={cn("font-semibold", difficultyStyles[campaign.difficulty])}>

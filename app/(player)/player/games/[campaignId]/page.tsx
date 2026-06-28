@@ -2,14 +2,12 @@ import { notFound } from "next/navigation"
 import Link from "next/link"
 import { ArrowLeft, BarChart3, Clock, Trophy } from "lucide-react"
 import { db } from "@/lib/db"
-import { getSampleCampaign } from "@/lib/game-engine/sample-campaigns"
+import { track } from "@/lib/analytics/events"
 import { getTemplate } from "@/lib/game-engine/templates"
 import { GameShell } from "@/components/brandquest/GameShell"
 import { RewardBadge } from "@/components/brandquest/RewardBadge"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { timeLeft, humanize } from "@/lib/utils"
-import type { Campaign } from "@/lib/db/types"
 
 export default async function GamePlayPage({
   params,
@@ -17,16 +15,15 @@ export default async function GamePlayPage({
   params: Promise<{ campaignId: string }>
 }) {
   const { campaignId } = await params
-
-  // Live campaigns (through the adapter) take priority; fall back to the bundled
-  // demo catalog so the play experience is always explorable before DynamoDB is
-  // connected. Sample plays still run the full server-side validation flow.
-  let campaign: Campaign | null = await db.getCampaign(campaignId)
-  if (!campaign) campaign = getSampleCampaign(campaignId) ?? null
+  const campaign = await db.getCampaign(campaignId)
   if (!campaign) notFound()
 
   const template = getTemplate(campaign.templateType)
-  const isSample = !db.isPersistent || campaign.creatorId === "sample-creator"
+  await track({
+    type: "campaign_viewed",
+    campaignId: campaign.campaignId,
+    creatorId: campaign.creatorId,
+  })
 
   return (
     <div>
@@ -43,13 +40,8 @@ export default async function GamePlayPage({
           <div className="flex items-center gap-2 text-sm">
             <span className="font-medium text-accent">{campaign.brandName}</span>
             <span className="text-muted-foreground">
-              · {template?.name ?? humanize(campaign.templateType)}
+              - {template?.name ?? humanize(campaign.templateType)}
             </span>
-            {isSample ? (
-              <Badge variant="outline" className="border-border/60">
-                Sample
-              </Badge>
-            ) : null}
           </div>
           <h1 className="text-balance text-2xl font-bold tracking-tight sm:text-3xl">
             {campaign.title}

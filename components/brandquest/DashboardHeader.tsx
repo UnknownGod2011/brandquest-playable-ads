@@ -14,11 +14,15 @@ interface NavLink {
 const ROLE_LINKS: Record<UserRole, NavLink[]> = {
   player: [
     { label: "Arcade", href: "/player" },
-    { label: "Profile", href: "/player/profile" },
+    { label: "Profile / My Stats", href: "/player/profile" },
+    { label: "Participated Games", href: "/player/participations" },
+    { label: "Rewards / Badges", href: "/player/rewards" },
+    { label: "Leaderboards", href: "/player/leaderboards" },
   ],
   creator: [
     { label: "Campaigns", href: "/creator" },
     { label: "New campaign", href: "/creator/campaigns/new" },
+    { label: "Custom games", href: "/creator/custom-games" },
   ],
   admin: [{ label: "Review queue", href: "/admin/review" }],
 }

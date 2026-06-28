@@ -1,26 +1,22 @@
 import type { Metadata } from "next"
 import Link from "next/link"
-import { Gamepad2, Target, Trophy, Award, Medal } from "lucide-react"
+import { Gamepad2, Medal, Target, Trophy } from "lucide-react"
 import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/auth/current-user"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { StatGrid } from "@/components/brandquest/StatGrid"
-import { GameCard } from "@/components/brandquest/GameCard"
 import { EmptyState } from "@/components/brandquest/EmptyState"
 import { formatNumber } from "@/lib/utils"
 
 export const metadata: Metadata = {
-  title: "Profile — BrandQuest",
+  title: "Profile / My Stats - BrandQuest",
 }
 
 export default async function PlayerProfilePage() {
   const user = await getCurrentUser()
-  const [profile, played] = await Promise.all([
-    user ? db.getPlayerProfile(user.userId) : Promise.resolve(null),
-    user ? db.getCampaignsPlayed(user.userId) : Promise.resolve([]),
-  ])
+  const profile = user ? await db.getPlayerProfile(user.userId) : null
 
   if (!profile) {
     return (
@@ -28,8 +24,8 @@ export default async function PlayerProfilePage() {
         <ProfileHeader name={user?.displayName ?? "Player"} />
         <EmptyState
           icon={Gamepad2}
-          title="Start playing to build your profile"
-          description="Play campaigns to earn XP, level up, win rewards, and collect badges. Your stats and won games will appear here."
+          title="Start playing to build your stats"
+          description="Play live campaigns to earn XP, level up, improve your rank, and unlock reward achievements."
           action={
             <Button render={<Link href="/player" />}>Browse the arcade</Button>
           }
@@ -60,51 +56,9 @@ export default async function PlayerProfilePage() {
           { label: "Games played", value: formatNumber(profile.gamesPlayed), icon: Gamepad2, accent: "primary" },
           { label: "Total attempts", value: formatNumber(profile.totalAttempts), icon: Target },
           { label: "Wins", value: formatNumber(profile.wins), icon: Trophy, accent: "reward" },
-          { label: "Best rank", value: profile.bestRank ? `#${profile.bestRank}` : "—", icon: Medal, accent: "accent" },
+          { label: "Best rank", value: profile.bestRank ? `#${profile.bestRank}` : "-", icon: Medal, accent: "accent" },
         ]}
       />
-
-      <section>
-        <h2 className="mb-3 text-lg font-semibold">Badge collection</h2>
-        {profile.badges.length === 0 ? (
-          <EmptyState
-            icon={Award}
-            title="No badges yet"
-            description="Win campaigns and hit milestones to start your badge collection."
-          />
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {profile.badges.map((b) => (
-              <Card key={b.id} className="flex flex-row items-center gap-3 p-4">
-                <div className="flex size-10 items-center justify-center rounded-xl bg-reward/15 text-reward">
-                  <Award className="size-5" aria-hidden="true" />
-                </div>
-                <div>
-                  <p className="font-medium">{b.name}</p>
-                  <p className="text-xs text-muted-foreground">{b.description}</p>
-                </div>
-              </Card>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section>
-        <h2 className="mb-3 text-lg font-semibold">Games played</h2>
-        {played.length === 0 ? (
-          <EmptyState
-            icon={Gamepad2}
-            title="No games played yet"
-            description="Campaigns you participate in will show here, with a WINNER ribbon on the ones you win."
-          />
-        ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {played.map((c) => (
-              <GameCard key={c.campaignId} campaign={c} />
-            ))}
-          </div>
-        )}
-      </section>
     </div>
   )
 }

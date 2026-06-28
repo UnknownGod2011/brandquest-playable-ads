@@ -8,6 +8,28 @@
 
 import { z } from "zod"
 
+const unsafeCampaignPattern = /<script|<\/script|javascript:|data:text\/html/i
+
+function safeText(min: number, max: number, message: string) {
+  return z
+    .string()
+    .min(min, message)
+    .max(max)
+    .refine((value) => !unsafeCampaignPattern.test(value), {
+      message: "Executable script-like content is not allowed.",
+    })
+}
+
+function safeOptionalText(max: number) {
+  return z
+    .string()
+    .max(max)
+    .refine((value) => !unsafeCampaignPattern.test(value), {
+      message: "Executable script-like content is not allowed.",
+    })
+    .optional()
+}
+
 export const campaignCategories = [
   "food_beverage",
   "fashion",
@@ -47,21 +69,21 @@ export const templateTypes = [
 
 export const quizQuestionSchema = z.object({
   id: z.string(),
-  prompt: z.string().min(3, "Question is too short").max(280),
+  prompt: safeText(3, 280, "Question is too short"),
   options: z
-    .array(z.string().min(1, "Option cannot be empty").max(120))
+    .array(safeText(1, 120, "Option cannot be empty"))
     .min(2, "At least 2 options")
     .max(6, "At most 6 options"),
   correctIndex: z.number().int().min(0),
 })
 
 export const templateConfigSchema = z.object({
-  instructions: z.string().max(500).optional(),
+  instructions: safeOptionalText(500),
   timeLimitSeconds: z.number().int().min(5).max(600).optional(),
   scoringRule: z.enum(["points", "time", "accuracy", "combo"]).optional(),
   maxPossibleScore: z.number().int().min(1).max(1_000_000).optional(),
-  successMessage: z.string().max(280).optional(),
-  rewardMessage: z.string().max(280).optional(),
+  successMessage: safeOptionalText(280),
+  rewardMessage: safeOptionalText(280),
   brandColor: z.string().max(32).optional(),
   logoUrl: z.string().url().optional().or(z.literal("")),
   minDurationSeconds: z.number().int().min(0).max(600).optional(),
@@ -71,24 +93,35 @@ export const templateConfigSchema = z.object({
   memoryCards: z.array(z.string()).optional(),
   reactionTargets: z.number().int().min(3).max(50).optional(),
   externalDemoUrl: z.string().url().optional().or(z.literal("")),
+  scrambleWords: z.array(safeText(2, 40, "Word is too short")).max(12).optional(),
+  puzzleTiles: z.number().int().min(4).max(16).optional(),
+  patternLength: z.number().int().min(3).max(8).optional(),
+  patternRounds: z.number().int().min(2).max(12).optional(),
+  typingText: safeOptionalText(500),
+  targetPrice: z.number().min(0).max(1_000_000).optional(),
+  priceTolerance: z.number().min(0).max(1_000_000).optional(),
+  runnerDurationSeconds: z.number().int().min(10).max(120).optional(),
+  runnerTokenValue: z.number().int().min(1).max(1000).optional(),
 })
 
 export const createCampaignSchema = z
   .object({
-    title: z.string().min(3, "Title must be at least 3 characters").max(80),
-    brandName: z.string().min(2, "Brand name is required").max(60),
-    description: z.string().min(10, "Add a longer description").max(600),
+    title: safeText(3, 80, "Title must be at least 3 characters"),
+    previewTitle: safeOptionalText(80),
+    previewText: safeOptionalText(180),
+    brandName: safeText(2, 60, "Brand name is required"),
+    description: safeText(10, 600, "Add a longer description"),
     category: z.enum(campaignCategories),
     difficulty: z.enum(difficulties),
-    reward: z.string().min(2, "Describe the reward").max(120),
+    reward: safeText(2, 120, "Describe the reward"),
     rewardValue: z.number().min(0, "Must be 0 or more").max(1_000_000),
     numberOfWinners: z.number().int().min(1, "At least 1 winner").max(10_000),
     startDate: z.string().min(1, "Start date is required"),
     endDate: z.string().min(1, "End date is required"),
     maxAttemptsPerPlayer: z.number().int().min(1).max(100),
-    eligibilityRules: z.string().max(600).optional().default(""),
+    eligibilityRules: safeOptionalText(600).default(""),
     brandLink: z.string().url("Enter a valid URL").or(z.literal("")),
-    thumbnailUrl: z.string().optional(),
+    thumbnailUrl: z.string().url("Enter a valid URL").optional().or(z.literal("")),
     templateType: z.enum(templateTypes),
     isCustom: z.boolean().default(false),
     customSubmissionId: z.string().optional(),

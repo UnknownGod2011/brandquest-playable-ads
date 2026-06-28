@@ -25,6 +25,10 @@ import type {
   RewardClaim,
   AnalyticsEvent,
   AdminReviewNote,
+  User,
+  UserUpsertInput,
+  CreatorProfile,
+  PlayerParticipation,
 } from "./types"
 import { noopDB } from "./noop"
 
@@ -64,6 +68,12 @@ export interface BrandQuestDB {
   readonly isPersistent: boolean
   readonly name: string
 
+  // Users / profiles
+  getUser(userId: string): Promise<User | null>
+  getUserByEmail(email: string): Promise<User | null>
+  upsertUser(input: UserUpsertInput): Promise<User>
+  getCreatorProfile(creatorId: string): Promise<CreatorProfile | null>
+
   // Campaigns
   listLiveCampaigns(filter?: CampaignFilter): Promise<Campaign[]>
   getCampaign(campaignId: string): Promise<Campaign | null>
@@ -83,6 +93,8 @@ export interface BrandQuestDB {
   // Players
   getPlayerProfile(playerId: string): Promise<PlayerProfile | null>
   getCampaignsPlayed(playerId: string): Promise<Campaign[]>
+  getPlayerParticipations(playerId: string): Promise<PlayerParticipation[]>
+  getPlayerRewardClaims(playerId: string): Promise<RewardClaim[]>
 
   // Analytics
   getCampaignAnalytics(campaignId: string): Promise<CampaignAnalytics | null>
@@ -113,11 +125,22 @@ export interface BrandQuestDB {
 /* -------------------------------------------------------------------------- */
 
 export function isDynamoEnabled(): boolean {
-  return (
-    process.env.USE_DYNAMODB === "true" &&
-    Boolean(process.env.AWS_REGION) &&
-    Boolean(process.env.BRANDQUEST_DYNAMODB_TABLE)
-  )
+  if (process.env.USE_DYNAMODB !== "true") return false
+
+  const missing = [
+    "AWS_REGION",
+    "BRANDQUEST_DYNAMODB_TABLE",
+    "AWS_ACCESS_KEY_ID",
+    "AWS_SECRET_ACCESS_KEY",
+  ].filter((key) => !process.env[key])
+
+  if (missing.length > 0) {
+    throw new Error(
+      `[brandquest] USE_DYNAMODB=true but required server-side env var(s) are missing: ${missing.join(", ")}.`,
+    )
+  }
+
+  return true
 }
 
 let cached: BrandQuestDB | null = null
@@ -138,4 +161,10 @@ export function getDB(): BrandQuestDB {
   return cached
 }
 
-export const db = getDB()
+export const db = new Proxy({} as BrandQuestDB, {
+  get(_target, prop: keyof BrandQuestDB) {
+    const adapter = getDB()
+    const value = adapter[prop]
+    return typeof value === "function" ? value.bind(adapter) : value
+  },
+})

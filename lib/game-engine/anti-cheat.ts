@@ -1,23 +1,14 @@
 /**
- * BrandQuest — Server-side anti-cheat & score validation
+ * BrandQuest - Server-side anti-cheat and score validation.
  *
- * This module is the heart of "scores are validated server-side". It is called
- * exclusively from server code (the /api/attempts route + server actions). The
- * client NEVER decides whether a score counts.
- *
- * Validation rules enforced here:
- *   - Reject attempts submitted after the campaign end date.
- *   - Reject attempts beyond maxAttemptsPerPlayer.
- *   - Reject duplicate attempt IDs.
- *   - Reject impossible scores (above the template's max plausible score).
- *   - Flag impossible duration (too fast to be human / negative).
- *   - Flag suspiciously high score-per-second rates.
+ * The client can play a game and report a score, but this module decides
+ * whether the score is plausible before persistence and leaderboard placement.
  */
 
 import type {
+  AttemptValidationStatus,
   Campaign,
   SuspicionFlag,
-  AttemptValidationStatus,
 } from "@/lib/db/types"
 import { maxPlausibleScore } from "./scoring"
 
@@ -33,7 +24,6 @@ export interface ValidationContext {
 export interface ValidationResult {
   status: AttemptValidationStatus
   flags: SuspicionFlag[]
-  /** Human-readable reasons, safe to surface to the client. */
   reasons: string[]
   rewardEligible: boolean
 }
@@ -41,15 +31,26 @@ export interface ValidationResult {
 const ABSOLUTE_MIN_DURATION_SECONDS = 1
 
 export function validateAttempt(ctx: ValidationContext): ValidationResult {
-  const { campaign, score, durationSeconds, existingAttemptCount, isDuplicateAttemptId } = ctx
+  const { campaign, score, durationSeconds, existingAttemptCount, isDuplicateAttemptId } =
+    ctx
   const now = ctx.now ?? new Date()
   const flags: SuspicionFlag[] = []
   const reasons: string[] = []
 
-  // --- Hard rejections ---------------------------------------------------
   if (isDuplicateAttemptId) {
     flags.push("duplicate_submission")
-    reasons.push("Duplicate attempt ID — this attempt was already submitted.")
+    reasons.push("Duplicate attempt ID. This attempt was already submitted.")
+    return reject(flags, reasons)
+  }
+
+  if (campaign.status !== "live") {
+    reasons.push("Campaign is not live.")
+    return reject(flags, reasons)
+  }
+
+  if (new Date(campaign.startDate).getTime() > now.getTime()) {
+    flags.push("before_campaign_start")
+    reasons.push("Campaign has not started yet.")
     return reject(flags, reasons)
   }
 
@@ -70,11 +71,10 @@ export function validateAttempt(ctx: ValidationContext): ValidationResult {
   const maxScore = maxPlausibleScore(campaign.templateConfig)
   if (!Number.isFinite(score) || score < 0 || score > maxScore) {
     flags.push("impossible_score")
-    reasons.push(`Score is outside the plausible range (0–${maxScore}).`)
+    reasons.push(`Score is outside the plausible range (0-${maxScore}).`)
     return reject(flags, reasons)
   }
 
-  // --- Soft flags (accepted but marked suspicious) -----------------------
   const minDuration =
     campaign.templateConfig.minDurationSeconds ?? ABSOLUTE_MIN_DURATION_SECONDS
   if (!Number.isFinite(durationSeconds) || durationSeconds < minDuration) {
@@ -83,7 +83,7 @@ export function validateAttempt(ctx: ValidationContext): ValidationResult {
   }
 
   const maxScorePerSecond =
-    campaign.templateConfig.maxScorePerSecond ?? maxScore // permissive default
+    campaign.templateConfig.maxScorePerSecond ?? maxScore
   if (durationSeconds > 0 && score / durationSeconds > maxScorePerSecond) {
     flags.push("impossible_score")
     reasons.push("Score accumulated faster than the game allows.")

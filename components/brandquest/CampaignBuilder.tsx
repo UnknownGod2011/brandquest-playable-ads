@@ -68,6 +68,8 @@ type FormState = Omit<CreateCampaignInput, "templateConfig"> & {
 
 const initialState: FormState = {
   title: "",
+  previewTitle: "",
+  previewText: "",
   brandName: "",
   description: "",
   category: "tech",
@@ -106,7 +108,7 @@ export function CampaignBuilder() {
     setForm((f) => ({ ...f, templateConfig: { ...f.templateConfig, ...patch } }))
   }
 
-  const playableTemplates = useMemo(
+  const templateCatalog = useMemo(
     () => GAME_TEMPLATES.filter((t) => t.type !== "custom"),
     [],
   )
@@ -121,7 +123,7 @@ export function CampaignBuilder() {
     const fieldErrors = parsed.error.flatten().fieldErrors as Record<string, string[]>
     const stepFields: Record<number, string[]> = {
       0: ["templateType"],
-      1: ["title", "brandName", "description", "category", "difficulty", "brandLink"],
+      1: ["title", "previewTitle", "previewText", "brandName", "description", "category", "difficulty", "brandLink", "thumbnailUrl"],
       2: ["templateConfig"],
       3: ["reward", "rewardValue", "numberOfWinners", "startDate", "endDate", "maxAttemptsPerPlayer"],
       4: [],
@@ -164,9 +166,11 @@ export function CampaignBuilder() {
 
       {step === 0 && (
         <TemplateStep
-          templates={playableTemplates}
+          templates={templateCatalog}
           selected={form.templateType}
           onSelect={(type) => {
+            const template = GAME_TEMPLATES.find((item) => item.type === type)
+            if (!template?.playable) return
             update("templateType", type)
             update("isCustom", false)
           }}
@@ -297,8 +301,8 @@ function TemplateStep({
     <div>
       <h2 className="text-lg font-semibold">Choose a game template</h2>
       <p className="mb-4 text-sm text-muted-foreground">
-        Playable templates work end to end today. Roadmap templates can be
-        configured now and become playable as shells ship.
+        Playable templates work end to end today. Roadmap templates are shown
+        for planning, but cannot be published until their shells are enabled.
       </p>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {templates.map((t) => {
@@ -306,12 +310,16 @@ function TemplateStep({
           return (
             <button
               key={t.type}
-              onClick={() => onSelect(t.type)}
+              onClick={() => {
+                if (t.playable) onSelect(t.type)
+              }}
+              disabled={!t.playable}
               className={cn(
                 "flex flex-col gap-2 rounded-2xl p-4 text-left ring-1 transition-all",
                 active
                   ? "bg-primary/10 ring-primary glow-primary"
                   : "bg-card ring-foreground/10 hover:ring-primary/40",
+                !t.playable && "cursor-not-allowed opacity-60 hover:ring-foreground/10",
               )}
             >
               <div className="flex items-center justify-between">
@@ -378,6 +386,26 @@ function DetailsStep({
           <FieldError errors={errors.title} />
         </div>
         <div>
+          <Label htmlFor="previewTitle">Preview title</Label>
+          <Input
+            id="previewTitle"
+            value={form.previewTitle ?? ""}
+            onChange={(e) => update("previewTitle", e.target.value)}
+            placeholder="Short arcade headline"
+          />
+          <FieldError errors={errors.previewTitle} />
+        </div>
+        <div>
+          <Label htmlFor="thumbnailUrl">Thumbnail URL</Label>
+          <Input
+            id="thumbnailUrl"
+            value={form.thumbnailUrl ?? ""}
+            onChange={(e) => update("thumbnailUrl", e.target.value)}
+            placeholder="https://example.com/campaign.png"
+          />
+          <FieldError errors={errors.thumbnailUrl} />
+        </div>
+        <div>
           <Label htmlFor="brand">Brand name</Label>
           <Input
             id="brand"
@@ -396,6 +424,17 @@ function DetailsStep({
             placeholder="https://yourbrand.com"
           />
           <FieldError errors={errors.brandLink} />
+        </div>
+        <div className="sm:col-span-2">
+          <Label htmlFor="previewText">Preview text</Label>
+          <Textarea
+            id="previewText"
+            value={form.previewText ?? ""}
+            onChange={(e) => update("previewText", e.target.value)}
+            placeholder="Short copy shown on arcade cards."
+            rows={2}
+          />
+          <FieldError errors={errors.previewText} />
         </div>
         <div className="sm:col-span-2">
           <Label htmlFor="desc">Description</Label>

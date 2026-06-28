@@ -28,11 +28,42 @@ import type {
   RewardClaim,
   AnalyticsEvent,
   AdminReviewNote,
+  User,
+  UserUpsertInput,
+  CreatorProfile,
+  PlayerParticipation,
 } from "./types"
 
 export const noopDB: BrandQuestDB = {
   isPersistent: false,
   name: "noop",
+
+  async getUser(_userId: string): Promise<User | null> {
+    return null
+  },
+
+  async getUserByEmail(_email: string): Promise<User | null> {
+    return null
+  },
+
+  async upsertUser(input: UserUpsertInput): Promise<User> {
+    const role =
+      input.requestedRole === "admin" && !input.allowAdmin
+        ? "player"
+        : input.requestedRole
+    return {
+      userId: input.userId,
+      email: input.email,
+      displayName: input.displayName,
+      avatarUrl: input.avatarUrl,
+      role,
+      createdAt: new Date().toISOString(),
+    }
+  },
+
+  async getCreatorProfile(_creatorId: string): Promise<CreatorProfile | null> {
+    return null
+  },
 
   async listLiveCampaigns(_filter?: CampaignFilter): Promise<Campaign[]> {
     return []
@@ -88,6 +119,16 @@ export const noopDB: BrandQuestDB = {
   },
 
   async getCampaignsPlayed(_playerId: string): Promise<Campaign[]> {
+    return []
+  },
+
+  async getPlayerParticipations(
+    _playerId: string,
+  ): Promise<PlayerParticipation[]> {
+    return []
+  },
+
+  async getPlayerRewardClaims(_playerId: string): Promise<RewardClaim[]> {
     return []
   },
 

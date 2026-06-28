@@ -1,0 +1,23 @@
+{
+  "title": "Spotify Vibe Rush",
+  "gameTitle": "Spotify Vibe Rush",
+  "brandName": "Spotify Demo Brand",
+  "previewTitle": "Can you catch the beat?",
+  "previewText": "Race through a music-themed playable ad, collect notes, dodge skips, and climb the leaderboard for a reward.",
+  "description": "A safe metadata-only custom game submission for a music-themed playable ad demo.",
+  "category": "entertainment",
+  "thumbnailUrl": "https://placehold.co/1200x675/1db954/0f172a?text=Spotify+Vibe+Rush",
+  "desiredGameStyle": "Brand Rush Runner",
+  "gameBrief": "Players move between lanes, collect branded music-note tokens, avoid skip blockers, and submit a score based on tokens collected, survival time, and clean dodges.",
+  "instructions": "Use left and right controls to switch lanes. Collect music-note tokens, avoid skip blockers, and finish the timed run with the highest score possible.",
+  "targetAudience": "Music listeners, Gen Z players, and fans of quick arcade challenges.",
+  "expectedScoreMin": 0,
+  "expectedScoreMax": 3000,
+  "scoringMethod": "points",
+  "maxPossibleScore": 5000,
+  "timeLimitSeconds": 45,
+  "reward": "Top 10 players get a free 1-month premium-style reward code in the demo.",
+  "rewardValue": 10,
+  "externalDemoUrl": "",
+  "securityNotes": "Metadata only. No JavaScript, executable files, tracking pixels, or third-party network calls are included in this submission."
+}

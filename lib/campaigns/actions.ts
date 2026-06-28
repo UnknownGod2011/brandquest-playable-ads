@@ -12,12 +12,13 @@
 import { revalidatePath } from "next/cache"
 import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/auth/current-user"
-import { canCreateCampaign } from "@/lib/security/permissions"
+import { canCreateCampaign, canEditCampaign } from "@/lib/security/permissions"
 import {
   createCampaignSchema,
   type CreateCampaignInput,
 } from "@/lib/validation/campaign"
 import { customGameSubmissionSchema } from "@/lib/validation/custom-game"
+import { isPlayable } from "@/lib/game-engine/templates"
 import { track } from "@/lib/analytics/events"
 import { generateId } from "@/lib/utils"
 import type { Campaign, CustomGameSubmission } from "@/lib/db/types"
@@ -52,12 +53,30 @@ export async function createCampaign(
     }
   }
   const value = parsed.data
+  if (!isPlayable(value.templateType)) {
+    return { ok: false, message: "Choose a playable template before publishing." }
+  }
+  if (value.templateType === "custom") {
+    if (!value.customSubmissionId) {
+      return { ok: false, message: "Custom campaigns require an approved submission." }
+    }
+    const submission = await db.getCustomSubmission(value.customSubmissionId)
+    if (
+      !submission ||
+      submission.status !== "approved" ||
+      submission.creatorId !== user.userId
+    ) {
+      return { ok: false, message: "Custom game submission is not approved for this creator." }
+    }
+  }
   const now = new Date().toISOString()
 
   const campaign: Campaign = {
     campaignId: generateId("camp"),
     creatorId: user.userId,
     title: value.title,
+    previewTitle: value.previewTitle || value.title,
+    previewText: value.previewText || value.description,
     brandName: value.brandName,
     description: value.description,
     category: value.category,
@@ -118,6 +137,10 @@ export async function updateCampaignStatus(
   if (!canCreateCampaign(user) || !user) {
     return { ok: false, message: "Not authorized." }
   }
+  const campaign = await db.getCampaign(campaignId)
+  if (!campaign || !canEditCampaign(user, campaign)) {
+    return { ok: false, message: "Not authorized." }
+  }
   await db.updateCampaign(campaignId, { status, updatedAt: new Date().toISOString() })
   revalidatePath("/creator")
   return {
@@ -152,6 +175,9 @@ export async function submitCustomGame(
     creatorId: user.userId,
     creatorName: user.displayName,
     gameTitle: value.gameTitle,
+    brandName: value.brandName ?? user.displayName,
+    description: value.description ?? value.instructions,
+    category: value.category ?? "other",
     instructions: value.instructions,
     thumbnailUrl: value.thumbnailUrl,
     expectedScoreMin: value.expectedScoreMin,
@@ -160,6 +186,7 @@ export async function submitCustomGame(
     maxPossibleScore: value.maxPossibleScore,
     timeLimitSeconds: value.timeLimitSeconds,
     reward: value.reward,
+    rewardValue: value.rewardValue ?? 0,
     externalDemoUrl: value.externalDemoUrl,
     securityNotes: value.securityNotes,
     status: "pending",

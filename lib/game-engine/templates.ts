@@ -52,9 +52,9 @@ export const GAME_TEMPLATES: GameTemplate[] = [
   },
   {
     type: "custom",
-    name: "Approved Custom Game Demo",
+    name: "Brand Rush Runner",
     description:
-      "A creator-submitted game that has passed admin review. Runs in a sandboxed iframe and reports scores through the secure score API.",
+      "A trusted first-party runner for approved custom-game campaigns. Players collect branded tokens, dodge blockers, and submit scores through the secure score API.",
     bestUseCase: "Bespoke branded experiences that go beyond templates.",
     estimatedPlayTime: "Varies",
     scoringType: "points",
@@ -65,12 +65,12 @@ export const GAME_TEMPLATES: GameTemplate[] = [
   },
 
   /* --------------------------- Catalog (roadmap) -------------------------- */
-  catalog("word_scramble", "Word Scramble", "Unscramble brand words against the clock.", "Tagline and product-name recall.", "30–60s", "time", "easy"),
+  playable("word_scramble", "Word Scramble", "Unscramble brand words against the clock.", "Tagline and product-name recall.", "30-60s", "points", "easy"),
   catalog("logo_puzzle", "Logo Puzzle", "Reassemble a brand logo from shuffled tiles.", "Logo recognition and brand recall.", "45–90s", "time", "medium"),
   catalog("spot_the_difference", "Spot the Difference", "Find differences between two product images.", "Product detail and attention campaigns.", "60–120s", "accuracy", "medium"),
   catalog("code_hunt", "Code Hunt", "Search a branded scene for hidden promo codes.", "Coupon drops and treasure-hunt promos.", "60–120s", "points", "medium"),
   catalog("maze_sprint", "Maze Sprint", "Navigate a branded maze to the prize.", "Playful, immersive brand worlds.", "45–90s", "time", "hard"),
-  catalog("pattern_recall", "Pattern Recall", "Repeat an expanding sequence of brand cues.", "Memory-driven engagement and retention.", "30–90s", "combo", "medium"),
+  playable("pattern_recall", "Pattern Recall", "Repeat an expanding sequence of brand cues.", "Memory-driven engagement and retention.", "30-90s", "combo", "medium"),
   catalog("typing_race", "Typing Race", "Type brand slogans accurately and fast.", "Slogan reinforcement campaigns.", "30–60s", "accuracy", "easy"),
   catalog("trivia_ladder", "Trivia Ladder", "Climb a ladder of increasingly hard trivia.", "Deep brand knowledge and superfans.", "90–180s", "points", "hard"),
   catalog("product_hunt_puzzle", "Product Hunt Puzzle", "Solve puzzles to reveal a new product.", "Product launches and teasers.", "60–120s", "points", "medium"),
@@ -103,6 +103,21 @@ function catalog(
     dataCaptured: ["score", "duration", "completion"],
     customizationOptions: ["instructions", "time limit", "brand colors", "success message"],
     playable: false,
+  }
+}
+
+function playable(
+  type: GameTemplateType,
+  name: string,
+  description: string,
+  bestUseCase: string,
+  estimatedPlayTime: string,
+  scoringType: GameTemplate["scoringType"],
+  difficulty: GameTemplate["difficulty"],
+): GameTemplate {
+  return {
+    ...catalog(type, name, description, bestUseCase, estimatedPlayTime, scoringType, difficulty),
+    playable: true,
   }
 }
 

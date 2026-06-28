@@ -56,6 +56,15 @@ export interface CreatorProfile {
   createdAt: string
 }
 
+export interface UserUpsertInput {
+  userId: string
+  email: string
+  displayName: string
+  avatarUrl?: string
+  requestedRole: UserRole
+  allowAdmin?: boolean
+}
+
 /* -------------------------------------------------------------------------- */
 /*  Campaigns                                                                  */
 /* -------------------------------------------------------------------------- */
@@ -79,6 +88,8 @@ export interface Campaign {
   campaignId: string
   creatorId: string
   title: string
+  previewTitle?: string
+  previewText?: string
   brandName: string
   description: string
   category: CampaignCategory
@@ -184,6 +195,20 @@ export interface TemplateConfig {
   reactionTargets?: number
   // Custom game
   externalDemoUrl?: string
+  // Word Scramble
+  scrambleWords?: string[]
+  // Logo Puzzle / Pattern Recall
+  puzzleTiles?: number
+  patternLength?: number
+  patternRounds?: number
+  // Typing Race / copy challenges
+  typingText?: string
+  // Price Guess
+  targetPrice?: number
+  priceTolerance?: number
+  // Runner-style first-party custom game
+  runnerDurationSeconds?: number
+  runnerTokenValue?: number
 }
 
 export interface QuizQuestion {
@@ -221,6 +246,7 @@ export type SuspicionFlag =
   | "impossible_duration"
   | "too_many_attempts"
   | "duplicate_submission"
+  | "before_campaign_start"
   | "after_campaign_end"
 
 export interface LeaderboardEntry {
@@ -254,6 +280,21 @@ export interface RewardClaim {
   playerName: string
   status: RewardClaimStatus
   claimedAt: string
+}
+
+export interface PlayerParticipation {
+  campaignId: string
+  playerId: string
+  title: string
+  brandName: string
+  reward: string
+  thumbnailUrl?: string
+  attemptsUsed: number
+  bestScore: number
+  bestRank: number | null
+  lastPlayedAt: string
+  won: boolean
+  status: CampaignStatus
 }
 
 /* -------------------------------------------------------------------------- */
@@ -335,6 +376,9 @@ export interface CustomGameSubmission {
   creatorId: string
   creatorName: string
   gameTitle: string
+  brandName: string
+  description: string
+  category: CampaignCategory
   instructions: string
   thumbnailUrl?: string
   expectedScoreMin: number
@@ -343,6 +387,7 @@ export interface CustomGameSubmission {
   maxPossibleScore: number
   timeLimitSeconds: number
   reward: string
+  rewardValue: number
   externalDemoUrl?: string
   securityNotes: string
   status: CustomGameReviewStatus

@@ -1,17 +1,5 @@
 "use client"
 
-/**
- * BrandQuest — GameShell
- *
- * Renders a playable shell for the core templates and submits the resulting
- * score to the server (/api/attempts), which is the ONLY place a score becomes
- * authoritative. The client never decides whether a score "counts" — it just
- * plays the game and reports a number; the server validates it.
- *
- * Playable shells: brand_quiz, memory_match, reaction_tap, custom (demo).
- * Other templates render a "coming soon" shell with a safe demo score path.
- */
-
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   AlertTriangle,
@@ -28,8 +16,11 @@ import { Card } from "@/components/ui/card"
 import { cn, generateId } from "@/lib/utils"
 import {
   scoreBrandQuiz,
+  scoreBrandRushRunner,
   scoreMemoryMatch,
+  scorePatternRecall,
   scoreReactionTap,
+  scoreWordScramble,
 } from "@/lib/game-engine/scoring"
 
 interface SubmitResponse {
@@ -87,18 +78,21 @@ export function GameShell({ campaign }: { campaign: Campaign }) {
     startedAt.current = Date.now()
     setResult(null)
     setPhase("playing")
-  }, [])
+    void fetch("/api/events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "game_started", campaignId: campaign.campaignId }),
+    }).catch(() => undefined)
+  }, [campaign.campaignId])
 
-  if (phase === "intro") {
-    return <IntroCard campaign={campaign} onStart={start} />
-  }
+  if (phase === "intro") return <IntroCard campaign={campaign} onStart={start} />
 
   if (phase === "submitting") {
     return (
       <Card className="flex flex-col items-center gap-3 p-10 text-center">
         <Loader2 className="size-7 animate-spin text-primary" aria-hidden="true" />
         <p className="text-sm text-muted-foreground">
-          Validating your score server-side…
+          Validating your score server-side...
         </p>
       </Card>
     )
@@ -108,7 +102,6 @@ export function GameShell({ campaign }: { campaign: Campaign }) {
     return <ResultCard result={result} onRetry={start} campaign={campaign} />
   }
 
-  // phase === "playing"
   return (
     <Card className="p-6">
       <ActiveGame campaign={campaign} onFinish={submit} />
@@ -116,17 +109,7 @@ export function GameShell({ campaign }: { campaign: Campaign }) {
   )
 }
 
-/* -------------------------------------------------------------------------- */
-/*  Intro & result                                                            */
-/* -------------------------------------------------------------------------- */
-
-function IntroCard({
-  campaign,
-  onStart,
-}: {
-  campaign: Campaign
-  onStart: () => void
-}) {
+function IntroCard({ campaign, onStart }: { campaign: Campaign; onStart: () => void }) {
   const cfg = campaign.templateConfig
   return (
     <Card className="p-6">
@@ -184,8 +167,8 @@ function ResultCard({
           </p>
         ) : null}
         <ul className="mt-1 space-y-1 text-sm text-muted-foreground">
-          {result.reasons.map((r) => (
-            <li key={r}>{r}</li>
+          {result.reasons.map((reason) => (
+            <li key={reason}>{reason}</li>
           ))}
         </ul>
 
@@ -193,8 +176,8 @@ function ResultCard({
           <div className="mt-2 flex items-start gap-2 rounded-lg bg-muted/50 p-3 text-left text-xs leading-relaxed text-muted-foreground">
             <AlertTriangle className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
             <span>
-              Score validation ready. Connect DynamoDB to persist attempts and
-              update the leaderboard.
+              This score was validated, but it was not persisted by the current
+              storage mode.
             </span>
           </div>
         ) : null}
@@ -214,10 +197,6 @@ function ResultCard({
   )
 }
 
-/* -------------------------------------------------------------------------- */
-/*  Active game switch                                                        */
-/* -------------------------------------------------------------------------- */
-
 function ActiveGame({
   campaign,
   onFinish,
@@ -232,10 +211,14 @@ function ActiveGame({
       return <MemoryMatchGame campaign={campaign} onFinish={onFinish} />
     case "reaction_tap":
       return <ReactionTapGame campaign={campaign} onFinish={onFinish} />
+    case "word_scramble":
+      return <WordScrambleGame campaign={campaign} onFinish={onFinish} />
+    case "pattern_recall":
+      return <PatternRecallGame campaign={campaign} onFinish={onFinish} />
     case "custom":
-      return <CustomClickerGame campaign={campaign} onFinish={onFinish} />
+      return <BrandRushRunnerGame campaign={campaign} onFinish={onFinish} />
     default:
-      return <ComingSoonGame onFinish={onFinish} />
+      return <ComingSoonGame />
   }
 }
 
@@ -247,16 +230,16 @@ function defaultInstructions(type: string): string {
       return "Flip cards to find all matching pairs with as few flips as possible."
     case "reaction_tap":
       return "Tap each target as fast as it appears. Speed is everything."
+    case "word_scramble":
+      return "Unscramble each brand word before the timer pressure catches up."
+    case "pattern_recall":
+      return "Watch the sequence, then repeat it from memory."
     case "custom":
-      return "Tap the glowing core as many times as you can before time runs out."
+      return "Move between lanes, collect brand tokens, and avoid blockers."
     default:
-      return "Play through the challenge to earn your score."
+      return "This template is not playable yet."
   }
 }
-
-/* -------------------------------------------------------------------------- */
-/*  Brand Quiz                                                                */
-/* -------------------------------------------------------------------------- */
 
 function BrandQuizGame({
   campaign,
@@ -317,10 +300,6 @@ function BrandQuizGame({
   )
 }
 
-/* -------------------------------------------------------------------------- */
-/*  Reaction Tap                                                              */
-/* -------------------------------------------------------------------------- */
-
 function ReactionTapGame({
   campaign,
   onFinish,
@@ -378,11 +357,7 @@ function ReactionTapGame({
   )
 }
 
-/* -------------------------------------------------------------------------- */
-/*  Memory Match                                                              */
-/* -------------------------------------------------------------------------- */
-
-const EMOJI_POOL = ["🔥", "⚡", "⭐", "🎯", "🏆", "💎", "🚀", "🎮", "🎁", "👾", "🛡️", "🍀"]
+const SYMBOL_POOL = ["BQ", "XP", "AD", "WIN", "GO", "VIP", "PRO", "MAX", "NEW", "TRY", "PLAY", "GIFT"]
 
 function MemoryMatchGame({
   campaign,
@@ -396,12 +371,8 @@ function MemoryMatchGame({
   const flipsRef = useRef(0)
 
   const deck = useMemo(() => {
-    const symbols = EMOJI_POOL.slice(0, pairs)
-    const cards = [...symbols, ...symbols].map((symbol, i) => ({
-      id: i,
-      symbol,
-    }))
-    // Shuffle (Fisher–Yates)
+    const symbols = SYMBOL_POOL.slice(0, pairs)
+    const cards = [...symbols, ...symbols].map((symbol, i) => ({ id: i, symbol }))
     for (let i = cards.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1))
       ;[cards[i], cards[j]] = [cards[j], cards[i]]
@@ -442,7 +413,9 @@ function MemoryMatchGame({
   return (
     <div>
       <div className="mb-3 flex items-center justify-between text-xs text-muted-foreground">
-        <span>Pairs: {matched.length / 2} / {pairs}</span>
+        <span>
+          Pairs: {matched.length / 2} / {pairs}
+        </span>
         <span>Flips: {flipsRef.current}</span>
       </div>
       <div className={cn("grid gap-2", cols)}>
@@ -454,7 +427,7 @@ function MemoryMatchGame({
               onClick={() => flip(id)}
               aria-label={isUp ? card.symbol : "Hidden card"}
               className={cn(
-                "flex aspect-square items-center justify-center rounded-xl text-2xl transition-all",
+                "flex aspect-square items-center justify-center rounded-xl text-sm font-bold transition-all",
                 isUp
                   ? "bg-primary/20 ring-1 ring-primary/40"
                   : "bg-secondary hover:bg-secondary/70",
@@ -470,67 +443,256 @@ function MemoryMatchGame({
   )
 }
 
-/* -------------------------------------------------------------------------- */
-/*  Custom clicker demo (stands in for an approved sandboxed custom game)     */
-/* -------------------------------------------------------------------------- */
-
-function CustomClickerGame({
+function WordScrambleGame({
   campaign,
   onFinish,
 }: {
   campaign: Campaign
   onFinish: (score: number) => void
 }) {
-  const duration = 10
-  const [count, setCount] = useState(0)
-  const [timeLeft, setTimeLeft] = useState(duration)
+  const words = useMemo(() => {
+    const configured = campaign.templateConfig.scrambleWords?.filter(Boolean)
+    const fallback = [campaign.brandName, "reward", "quest"].filter(Boolean)
+    return (configured?.length ? configured : fallback).slice(0, 8).map((word) => word.toUpperCase())
+  }, [campaign.brandName, campaign.templateConfig.scrambleWords])
+  const timeLimit = campaign.templateConfig.timeLimitSeconds ?? 60
+  const startedAt = useRef(Date.now())
+  const [index, setIndex] = useState(0)
+  const [solved, setSolved] = useState(0)
+  const [answer, setAnswer] = useState("")
+  const [feedback, setFeedback] = useState("")
 
-  useEffect(() => {
-    if (timeLeft <= 0) {
-      onFinish(count * 10)
-      return
-    }
-    const t = setTimeout(() => setTimeLeft((s) => s - 1), 1000)
-    return () => clearTimeout(t)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeLeft])
+  const scrambled = useMemo(() => scramble(words[index] ?? ""), [words, index])
+
+  function submitWord() {
+    const correct = answer.trim().toUpperCase() === words[index]
+    const nextSolved = solved + (correct ? 1 : 0)
+    setFeedback(correct ? "Correct" : `Answer: ${words[index]}`)
+    setSolved(nextSolved)
+    setAnswer("")
+    setTimeout(() => {
+      if (index + 1 >= words.length) {
+        const duration = Math.max(1, (Date.now() - startedAt.current) / 1000)
+        onFinish(scoreWordScramble(nextSolved, words.length, duration, timeLimit))
+      } else {
+        setFeedback("")
+        setIndex((current) => current + 1)
+      }
+    }, 650)
+  }
 
   return (
-    <div className="text-center">
-      <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
-        <span>Approved custom game (sandbox demo)</span>
-        <span>Time left: {timeLeft}s</span>
+    <div>
+      <div className="mb-4 flex items-center justify-between text-xs text-muted-foreground">
+        <span>
+          Word {index + 1} / {words.length}
+        </span>
+        <span>Solved: {solved}</span>
       </div>
-      <p className="mb-4 text-sm text-muted-foreground">
-        {campaign.templateConfig.instructions ??
-          "Tap the core as many times as you can!"}
-      </p>
-      <button
-        onClick={() => setCount((c) => c + 1)}
-        disabled={timeLeft <= 0}
-        aria-label="Tap the core"
-        className="mx-auto flex size-40 items-center justify-center rounded-full bg-primary text-2xl font-bold text-primary-foreground glow-primary transition-transform active:scale-95 disabled:opacity-50"
-      >
-        {count}
-      </button>
+      <div className="rounded-xl bg-secondary/60 p-6 text-center">
+        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Unscramble</p>
+        <p className="mt-2 text-3xl font-black tracking-[0.3em] text-primary">
+          {scrambled}
+        </p>
+      </div>
+      <div className="mt-4 flex gap-2">
+        <input
+          value={answer}
+          onChange={(event) => setAnswer(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && answer.trim()) submitWord()
+          }}
+          className="min-h-10 flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm"
+          placeholder="Type the word"
+        />
+        <Button onClick={submitWord} disabled={!answer.trim()}>
+          Submit
+        </Button>
+      </div>
+      {feedback ? <p className="mt-2 text-sm text-muted-foreground">{feedback}</p> : null}
     </div>
   )
 }
 
-/* -------------------------------------------------------------------------- */
-/*  Coming soon (catalog templates without a shell yet)                       */
-/* -------------------------------------------------------------------------- */
+function PatternRecallGame({
+  campaign,
+  onFinish,
+}: {
+  campaign: Campaign
+  onFinish: (score: number) => void
+}) {
+  const patternLength = campaign.templateConfig.patternLength ?? 4
+  const rounds = campaign.templateConfig.patternRounds ?? 5
+  const [round, setRound] = useState(1)
+  const [sequence, setSequence] = useState<number[]>(() => makeSequence(patternLength, 1))
+  const [input, setInput] = useState<number[]>([])
+  const [showing, setShowing] = useState(true)
+  const [mistakes, setMistakes] = useState(0)
 
-function ComingSoonGame({ onFinish }: { onFinish: (score: number) => void }) {
+  useEffect(() => {
+    setShowing(true)
+    const timeout = setTimeout(() => {
+      setShowing(false)
+      setInput([])
+    }, 900 + sequence.length * 250)
+    return () => clearTimeout(timeout)
+  }, [sequence])
+
+  function press(tile: number) {
+    if (showing) return
+    const next = [...input, tile]
+    setInput(next)
+    const expected = sequence[next.length - 1]
+    if (tile !== expected) {
+      onFinish(scorePatternRecall(round - 1, mistakes + 1))
+      return
+    }
+    if (next.length === sequence.length) {
+      if (round >= rounds) {
+        onFinish(scorePatternRecall(rounds, mistakes))
+      } else {
+        const nextRound = round + 1
+        setRound(nextRound)
+        setSequence(makeSequence(patternLength, nextRound))
+      }
+    }
+  }
+
+  return (
+    <div>
+      <div className="mb-3 flex items-center justify-between text-xs text-muted-foreground">
+        <span>
+          Round {round} / {rounds}
+        </span>
+        <span>{showing ? "Memorize the sequence" : "Repeat it"}</span>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        {[0, 1, 2, 3].map((tile) => {
+          const active = showing && sequence.includes(tile)
+          return (
+            <button
+              key={tile}
+              onClick={() => press(tile)}
+              className={cn(
+                "h-24 rounded-xl border border-border bg-secondary text-lg font-bold transition",
+                active && "bg-primary text-primary-foreground glow-primary",
+                !showing && "hover:bg-primary/20",
+              )}
+            >
+              {tile + 1}
+            </button>
+          )
+        })}
+      </div>
+      <p className="mt-3 text-xs text-muted-foreground">
+        Progress: {input.length} / {sequence.length}
+      </p>
+    </div>
+  )
+}
+
+function BrandRushRunnerGame({
+  campaign,
+  onFinish,
+}: {
+  campaign: Campaign
+  onFinish: (score: number) => void
+}) {
+  const duration = campaign.templateConfig.runnerDurationSeconds ?? 30
+  const tokenValue = campaign.templateConfig.runnerTokenValue ?? 25
+  const [lane, setLane] = useState(1)
+  const [timeLeft, setTimeLeft] = useState(duration)
+  const [tokens, setTokens] = useState(0)
+  const [avoided, setAvoided] = useState(0)
+  const [hit, setHit] = useState(false)
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "ArrowLeft") setLane((value) => Math.max(0, value - 1))
+      if (event.key === "ArrowRight") setLane((value) => Math.min(2, value + 1))
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [])
+
+  useEffect(() => {
+    if (timeLeft <= 0 || hit) {
+      const survived = duration - Math.max(0, timeLeft)
+      onFinish(scoreBrandRushRunner(tokens, survived, avoided, tokenValue))
+      return
+    }
+    const tick = setTimeout(() => {
+      setTimeLeft((value) => value - 1)
+      setTokens((value) => value + (Math.random() > 0.35 ? 1 : 0))
+      setAvoided((value) => value + 1)
+      if (Math.random() < 0.08 && lane === 1) setHit(true)
+    }, 1000)
+    return () => clearTimeout(tick)
+  }, [avoided, duration, hit, lane, onFinish, timeLeft, tokenValue, tokens])
+
+  return (
+    <div>
+      <div className="mb-3 flex items-center justify-between text-xs text-muted-foreground">
+        <span>Tokens: {tokens}</span>
+        <span>Time left: {Math.max(0, timeLeft)}s</span>
+      </div>
+      <div className="relative h-72 overflow-hidden rounded-xl bg-arcade-grid p-4">
+        <div className="absolute inset-x-6 bottom-5 grid grid-cols-3 gap-3">
+          {[0, 1, 2].map((value) => (
+            <button
+              key={value}
+              onClick={() => setLane(value)}
+              className={cn(
+                "h-44 rounded-xl border border-border/70 bg-background/50",
+                value === lane && "bg-primary/25 ring-2 ring-primary",
+              )}
+              aria-label={`Move to lane ${value + 1}`}
+            >
+              {value === lane ? (
+                <span className="mx-auto block size-10 rounded-full bg-neon glow-primary" />
+              ) : null}
+            </button>
+          ))}
+        </div>
+        <div className="absolute left-1/2 top-6 -translate-x-1/2 rounded-full bg-reward px-3 py-1 text-xs font-bold text-background">
+          {hit ? "Obstacle hit" : "Collect tokens"}
+        </div>
+      </div>
+      <div className="mt-3 flex justify-center gap-2">
+        <Button variant="outline" onClick={() => setLane((value) => Math.max(0, value - 1))}>
+          Left
+        </Button>
+        <Button variant="outline" onClick={() => setLane((value) => Math.min(2, value + 1))}>
+          Right
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+function ComingSoonGame() {
   return (
     <div className="text-center">
       <p className="text-sm text-muted-foreground">
-        A playable shell for this template is on the roadmap. You can still run
-        the score validation flow with a demo score.
+        This template is in the catalog, but its playable shell is not enabled
+        yet. Choose a playable template for score submission.
       </p>
-      <Button className="mt-4" onClick={() => onFinish(100)}>
-        Submit demo score
-      </Button>
     </div>
+  )
+}
+
+function scramble(word: string): string {
+  const letters = word.split("")
+  for (let i = letters.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[letters[i], letters[j]] = [letters[j], letters[i]]
+  }
+  const value = letters.join("")
+  return value === word && word.length > 1 ? `${word.slice(1)}${word[0]}` : value
+}
+
+function makeSequence(patternLength: number, round: number): number[] {
+  return Array.from({ length: patternLength + round - 1 }, () =>
+    Math.floor(Math.random() * 4),
   )
 }

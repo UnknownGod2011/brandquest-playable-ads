@@ -33,6 +33,15 @@ export function maxPlausibleScore(config: TemplateConfig): number {
   if (config.memoryPairs) {
     return config.memoryPairs * 100
   }
+  if (config.scrambleWords?.length) {
+    return config.scrambleWords.length * 150
+  }
+  if (config.patternRounds) {
+    return config.patternRounds * 200
+  }
+  if (config.runnerDurationSeconds) {
+    return Math.max(1, config.runnerDurationSeconds) * 100
+  }
   return 10_000
 }
 
@@ -65,6 +74,40 @@ export function scoreMemoryMatch(
   const efficiency = Math.min(1, perfectFlips / Math.max(perfectFlips, flips))
   const timePenalty = Math.min(0.5, durationSeconds / 600)
   return Math.round(pairs * 100 * efficiency * (1 - timePenalty))
+}
+
+/** Word Scramble: correct words plus a speed bonus. */
+export function scoreWordScramble(
+  solvedWords: number,
+  totalWords: number,
+  durationSeconds: number,
+  timeLimitSeconds: number,
+): number {
+  const base = solvedWords * 100
+  const completionBonus = solvedWords === totalWords ? 100 : 0
+  const speedBonus = Math.max(
+    0,
+    Math.round((1 - durationSeconds / Math.max(1, timeLimitSeconds)) * 50),
+  )
+  return base + completionBonus + speedBonus
+}
+
+/** Pattern Recall: rewards longer completed sequences with small mistake penalties. */
+export function scorePatternRecall(roundsCompleted: number, mistakes: number): number {
+  return Math.max(0, roundsCompleted * 200 - mistakes * 75)
+}
+
+/** Brand Rush Runner: tokens, survival time, and avoided obstacles. */
+export function scoreBrandRushRunner(
+  tokens: number,
+  secondsSurvived: number,
+  obstaclesAvoided: number,
+  tokenValue = 25,
+): number {
+  return Math.max(
+    0,
+    tokens * tokenValue + secondsSurvived * 10 + obstaclesAvoided * 15,
+  )
 }
 
 /** Whether higher or lower values are better for ranking purposes. */

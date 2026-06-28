@@ -1,92 +1,157 @@
-# BrandQuest — Playable ads. Real rewards.
+# BrandQuest
 
-BrandQuest turns ads into interactive game campaigns. Brands launch skill-based
-challenges with real rewards, players compete on validated leaderboards, and
-every attempt becomes measurable engagement.
+Playable ads. Real rewards.
 
-It runs **fully and safely with zero configuration** — no database, no API keys,
-no credentials required. When nothing is connected it uses a no-op data adapter
-that returns empty data with real empty states, plus a built-in catalog of
-**sample campaigns** you can actually play to see the whole flow.
+BrandQuest is a full-stack playable-ads platform. Creators launch interactive
+mini-game campaigns with incentives, players compete on validated
+leaderboards, and brands get measurable engagement instead of passive
+impressions.
 
-## Roles
+## Product Flows
 
-| Role | What they do | Entry |
-| --- | --- | --- |
-| **Player** | Browse the arcade, play games, climb leaderboards, win rewards, earn XP & badges | `/player` |
-| **Creator** | Build playable ad campaigns (5-step builder), submit custom games, view analytics | `/creator` |
-| **Admin** | Review and approve/reject custom game submissions | `/admin/review` |
+### Player
 
-There is no fake login: the role screen (`/role`) stores only the selected role
-in an httpOnly cookie to decide which dashboard to show. Real identity is wired
-in later (see `lib/auth/auth.config.ts`).
+- Sign in with Google.
+- Browse `/player` for live campaigns from DynamoDB.
+- Open a campaign, play a built-in template, and submit a score.
+- Score submissions go through `POST /api/attempts`.
+- Attempts update DynamoDB-backed leaderboards, participation records, XP, and
+  badges.
 
-## Game templates
+### Creator
 
-Four templates are **playable end-to-end today**: Brand Quiz, Memory Match,
-Reaction Tap, and an approved Custom Game demo (sandboxed clicker). 16 more are
-in the catalog as roadmap entries that creators can already configure. See
-`lib/game-engine/templates.ts`.
+- Sign in with Google and choose Creator during onboarding.
+- Create campaigns with title, brand, preview title/text, thumbnail URL,
+  template, incentive/prize, max attempts, and schedule.
+- View only campaigns owned by the signed-in creator.
+- See analytics computed from real attempts/events, including unique players,
+  attempts, average score, top score, funnel, and recent engagement.
+- Submit custom-game metadata for admin review.
 
-## Security model
+### Admin
 
-- **Scores are validated server-side.** The client plays a game and reports a
-  number to `POST /api/attempts` — the only authoritative scoring endpoint. The
-  server re-checks the score against the template's plausible max, runs
-  anti-cheat heuristics (`lib/game-engine/anti-cheat.ts`), rate-limits, and only
-  then is a score eligible for the leaderboard.
-- **Custom games are metadata only.** No arbitrary code is uploaded or executed.
-  Approved games are intended to run in a sandboxed iframe and report scores
-  through the same secure score API. Every submission is admin-reviewed.
-- **Authorization is server-side** (`lib/security/permissions.ts`). The client
-  hiding a button is never the security boundary.
+- Admin access is protected separately from normal Google role onboarding.
+- New users cannot self-select admin.
+- Admin credentials are configured by server-side environment variables only.
+- Admins approve, reject, or comment on custom-game submissions.
+- Approval creates a safe first-party campaign using the trusted Brand Rush
+  Runner runtime. Uploaded JavaScript is never executed.
 
-## Architecture
+## Playable Templates
 
-A live, annotated diagram is at `/architecture`. In short:
+Fully playable in this app:
 
+- Brand Quiz
+- Memory Match
+- Reaction Tap
+- Word Scramble
+- Pattern Recall
+- Brand Rush Runner
+
+Roadmap templates are visible in the catalog but disabled for publishing until
+their playable runtime exists. This prevents broken campaigns from going live.
+
+## Custom Game Safety
+
+Custom game submissions are metadata/config only:
+
+- brand name
+- game title
+- preview copy
+- thumbnail URL
+- reward/incentive
+- scoring method
+- expected score range
+- time limit
+- instructions/security notes
+
+BrandQuest does not execute arbitrary uploaded JavaScript, run uploaded files,
+or trust custom-game client scores. Production custom games should run only
+after review in a sandboxed iframe with a secure score API.
+
+## Demo Asset
+
+Use `demo-assets/spotify-vibe-rush-custom-game.json` for the submission video.
+Paste it into the Custom Games form's Import JSON box, submit it, then approve
+it as admin. Approval maps it to Brand Rush Runner as a trusted first-party
+playable campaign.
+
+## DynamoDB
+
+The app uses a single existing DynamoDB table. It does not create AWS resources.
+
+- Table: `BrandQuest`
+- Region: `us-east-1`
+- Partition key: `pk`
+- Sort key: `sk`
+
+Access patterns:
+
+- `USER#{userId}` / `PROFILE` for users
+- `EMAIL#{email}` / `USER` for email lookup
+- `CREATOR#{creatorId}` / `CAMPAIGN#{campaignId}` for creator campaign lists
+- `CAMPAIGN#{campaignId}` / `META` for campaign detail
+- `CAMPAIGNS#STATUS#live` for player arcade live campaigns
+- `CAMPAIGN#{campaignId}` / `ATTEMPT#...` for campaign attempts/leaderboards
+- `PLAYER#{playerId}` / `ATTEMPT#...` for player attempt history
+- `PLAYER#{playerId}` / `CAMPAIGN#{campaignId}` for participation
+- `CAMPAIGN#{campaignId}` / `EVENT#...` for analytics events
+- `CUSTOM_REVIEW#{status}` for admin review queues
+
+Some hackathon-MVP reads aggregate bounded campaign attempts/events for
+analytics. At production scale, these should be replaced or augmented with
+pre-aggregated rollup items and GSIs for high-volume leaderboards and analytics
+windows.
+
+## Environment Variables
+
+Required for real persistence/auth:
+
+- `USE_DYNAMODB`
+- `AWS_REGION`
+- `BRANDQUEST_DYNAMODB_TABLE`
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+- `AUTH_SECRET`
+- `NEXTAUTH_SECRET`
+- `NEXTAUTH_URL`
+
+Required for credential-based admin access:
+
+- `ADMIN_EMAIL`
+- `ADMIN_PASSWORD_HASH`
+- `ADMIN_PASSWORD_SALT`
+
+Never prefix secrets with `NEXT_PUBLIC_`. AWS keys and auth secrets must remain
+server-side only.
+
+## Local Development
+
+```bash
+pnpm install
+npm run typecheck
+npm run build
+npm run dev
 ```
-UI (App Router, RSC + client islands)
-  -> Server Actions / Route Handlers   (validate + authorize)
-    -> Zod validation + game engine     (scoring, anti-cheat, progression)
-      -> DB adapter interface           (lib/db)
-         -> noop (default)  |  DynamoDB (opt-in via env)
-```
 
-The whole app depends only on the `BrandQuestDB` interface, so enabling real
-persistence is a single swap driven by environment variables.
+Open `http://localhost:3000`.
 
-## Enabling persistence (optional)
+## Deployment
 
-Copy `.env.example` to `.env.local` and set `USE_DYNAMODB=true` with your AWS
-region and table name. The DynamoDB adapter (`lib/db/dynamodb.ts`) documents the
-single-table key design. Without these, the no-op adapter keeps everything
-working.
+The app is configured for Vercel and uses only server-side DynamoDB calls. Set
+the required env vars in Vercel for Production, Preview, and Development. Do not
+commit `.env.local`, `.vercel`, `.next`, `node_modules`, or admin credential
+files.
 
-## Tech
+## Security Choices
 
-Next.js 16 (App Router) · React 19 · TypeScript · Tailwind v4 · shadcn/Base UI ·
-Zod · Recharts.
-
-## Project layout
-
-```
-app/
-  (marketing)/      Landing page
-  architecture/     System architecture diagram
-  (auth)/           Role selection + sign-in
-  (player)/         Arcade, profile, play, leaderboards
-  (creator)/        Dashboard, 5-step builder, custom games, analytics
-  (admin)/          Custom game review queue
-  api/              attempts (scoring), campaigns, leaderboard
-lib/
-  db/               Adapter interface, noop + DynamoDB implementations, types
-  game-engine/      Templates, scoring, anti-cheat, progression, sample data
-  validation/       Zod schemas (campaign, attempt, custom-game, reward)
-  analytics/        Event tracking + metric calculations
-  security/         Permissions + rate limiting
-  auth/             Role session + server actions (provider-ready)
-  campaigns/        Campaign & custom-game server actions
-  admin/            Review server actions
-components/brandquest/  Feature components
-```
+- All important inputs are validated with Zod.
+- Scores are revalidated server-side.
+- Campaign ownership and admin access are checked server-side.
+- Role cookies are onboarding hints only, not authorization.
+- DynamoDB is selected only when `USE_DYNAMODB=true`; otherwise the app uses
+  clean empty states and no fake campaign fallback.
+- No AWS SDK imports are used in client components.
+- No arbitrary uploaded custom-game code is executed.
