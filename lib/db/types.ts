@@ -132,6 +132,7 @@ export type GameTemplateType =
   | "memory_match"
   | "reaction_tap"
   | "custom"
+  | "beat_tiles"
   | "word_scramble"
   | "logo_puzzle"
   | "spot_the_difference"
@@ -154,6 +155,15 @@ export type ScoringType =
   | "time" // lower time = better
   | "accuracy"
   | "combo"
+
+export type LeaderboardMetric =
+  | "score"
+  | "accuracy"
+  | "completionTime"
+  | "combo"
+  | "submittedAt"
+
+export type SortDirection = "asc" | "desc"
 
 export interface GameTemplate {
   type: GameTemplateType
@@ -207,8 +217,17 @@ export interface TemplateConfig {
   targetPrice?: number
   priceTolerance?: number
   // Runner-style first-party custom game
+  customRuntime?: "brand_rush_runner" | "beat_tiles"
   runnerDurationSeconds?: number
   runnerTokenValue?: number
+  // Beat Tiles / rhythm scoring
+  beatTilesDurationSeconds?: number
+  beatTilesSpawnMs?: number
+  beatTilesPerfectWindow?: number
+  beatTilesGreatWindow?: number
+  primaryMetric?: LeaderboardMetric
+  sortDirection?: SortDirection
+  tieBreakers?: LeaderboardMetric[]
 }
 
 export interface QuizQuestion {
@@ -235,6 +254,11 @@ export interface GameAttempt {
   playerName: string
   score: number
   durationSeconds: number
+  accuracy?: number
+  combo?: number
+  maxCombo?: number
+  hits?: number
+  misses?: number
   attemptNumber: number
   validationStatus: AttemptValidationStatus
   flags: SuspicionFlag[]
@@ -256,6 +280,10 @@ export interface LeaderboardEntry {
   avatarUrl?: string
   score: number
   durationSeconds: number
+  accuracy?: number
+  maxCombo?: number
+  hits?: number
+  misses?: number
   attemptsUsed: number
   validationStatus: AttemptValidationStatus
   submittedAt: string
@@ -390,6 +418,11 @@ export interface CustomGameSubmission {
   rewardValue: number
   externalDemoUrl?: string
   securityNotes: string
+  desiredGameStyle?: string
+  primaryMetric?: LeaderboardMetric
+  sortDirection?: SortDirection
+  tieBreakers?: LeaderboardMetric[]
+  approvedCampaignId?: string
   status: CustomGameReviewStatus
   reviewNotes: AdminReviewNote[]
   submittedAt: string

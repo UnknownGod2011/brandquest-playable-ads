@@ -173,6 +173,9 @@ function ReviewDialog({
               <Detail label="Instructions">{submission.instructions}</Detail>
               <div className="grid grid-cols-2 gap-3">
                 <Detail label="Scoring">{submission.scoringMethod}</Detail>
+                <Detail label="Runtime">
+                  {submission.desiredGameStyle ?? "Brand Rush Runner"}
+                </Detail>
                 <Detail label="Time limit">{submission.timeLimitSeconds}s</Detail>
                 <Detail label="Expected score">
                   {submission.expectedScoreMin}–{submission.expectedScoreMax}

@@ -11,6 +11,7 @@ import { z } from "zod"
 const unsafeCampaignPattern = /<script|<\/script|javascript:|data:text\/html|on\w+\s*=/i
 const safeImageDataUrlPattern = /^data:image\/(?:png|jpeg|jpg|webp);base64,[a-z0-9+/=]+$/i
 const maxThumbnailLength = 280_000
+const leaderboardMetrics = ["score", "accuracy", "completionTime", "combo", "submittedAt"] as const
 
 function safeText(min: number, max: number, message: string) {
   return z
@@ -68,6 +69,7 @@ export const templateTypes = [
   "memory_match",
   "reaction_tap",
   "custom",
+  "beat_tiles",
   "word_scramble",
   "logo_puzzle",
   "spot_the_difference",
@@ -119,8 +121,16 @@ export const templateConfigSchema = z.object({
   typingText: safeOptionalText(500),
   targetPrice: z.number().min(0).max(1_000_000).optional(),
   priceTolerance: z.number().min(0).max(1_000_000).optional(),
+  customRuntime: z.enum(["brand_rush_runner", "beat_tiles"]).optional(),
   runnerDurationSeconds: z.number().int().min(10).max(120).optional(),
   runnerTokenValue: z.number().int().min(1).max(1000).optional(),
+  beatTilesDurationSeconds: z.number().int().min(15).max(120).optional(),
+  beatTilesSpawnMs: z.number().int().min(300).max(2000).optional(),
+  beatTilesPerfectWindow: z.number().min(0.01).max(0.2).optional(),
+  beatTilesGreatWindow: z.number().min(0.05).max(0.35).optional(),
+  primaryMetric: z.enum(leaderboardMetrics).optional(),
+  sortDirection: z.enum(["asc", "desc"]).optional(),
+  tieBreakers: z.array(z.enum(leaderboardMetrics)).max(4).optional(),
 })
 
 export const createCampaignSchema = z

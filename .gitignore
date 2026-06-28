@@ -15,6 +15,7 @@ __v0_jsx-dev-runtime.ts
 MISSING_ENV_KEYS.txt
 vercel-env-to-add.txt
 ADMIN_CREDENTIALS.local.txt
+progress.md
 
 # Common ignores
 node_modules

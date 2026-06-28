@@ -13,6 +13,7 @@ import { campaignCategories } from "./campaign"
 const unsafeMetadataPattern = /<script|<\/script|javascript:|data:text\/html|on\w+\s*=/i
 const safeImageDataUrlPattern = /^data:image\/(?:png|jpeg|jpg|webp);base64,[a-z0-9+/=]+$/i
 const maxThumbnailLength = 280_000
+const leaderboardMetrics = ["score", "accuracy", "completionTime", "combo", "submittedAt"] as const
 
 function safeText(min: number, max: number, message: string) {
   return z
@@ -75,6 +76,13 @@ export const customGameSubmissionSchema = z
       800,
       "Describe data captured and any third-party calls",
     ),
+    desiredGameStyle: z.preprocess(
+      (value) => (value === "" ? undefined : value),
+      safeText(2, 80, "Desired game style is too short").optional(),
+    ),
+    primaryMetric: z.enum(leaderboardMetrics).optional(),
+    sortDirection: z.enum(["asc", "desc"]).optional(),
+    tieBreakers: z.array(z.enum(leaderboardMetrics)).max(4).optional(),
   })
   .refine((d) => d.expectedScoreMax >= d.expectedScoreMin, {
     message: "Max expected score must be greater than min",

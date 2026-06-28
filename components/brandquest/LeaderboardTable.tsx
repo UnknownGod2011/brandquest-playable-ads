@@ -40,6 +40,8 @@ export function LeaderboardTable({
   }
 
   const podium = entries.slice(0, 3)
+  const showAccuracy = entries.some((entry) => typeof entry.accuracy === "number")
+  const showCombo = entries.some((entry) => typeof entry.maxCombo === "number")
 
   return (
     <div className="space-y-6">
@@ -75,6 +77,8 @@ export function LeaderboardTable({
               <TableHead className="w-12">#</TableHead>
               <TableHead>Player</TableHead>
               <TableHead className="text-right">Score</TableHead>
+              {showAccuracy ? <TableHead className="text-right">Accuracy</TableHead> : null}
+              {showCombo ? <TableHead className="text-right">Max combo</TableHead> : null}
               <TableHead className="text-right">Time</TableHead>
               <TableHead className="text-right">Tries</TableHead>
               <TableHead>Status</TableHead>
@@ -95,6 +99,16 @@ export function LeaderboardTable({
                   <TableCell className="text-right tabular-nums">
                     {entry.score.toLocaleString()}
                   </TableCell>
+                  {showAccuracy ? (
+                    <TableCell className="text-right tabular-nums">
+                      {typeof entry.accuracy === "number" ? `${entry.accuracy}%` : "-"}
+                    </TableCell>
+                  ) : null}
+                  {showCombo ? (
+                    <TableCell className="text-right tabular-nums">
+                      {entry.maxCombo?.toLocaleString() ?? "-"}
+                    </TableCell>
+                  ) : null}
                   <TableCell className="text-right tabular-nums">
                     {entry.durationSeconds}s
                   </TableCell>

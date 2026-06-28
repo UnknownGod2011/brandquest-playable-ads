@@ -20,6 +20,7 @@ import type {
 } from "./types"
 import { computeAnalytics } from "@/lib/analytics/calculations"
 import { BADGE_RULES, resolveLevel, xpForAttempt } from "@/lib/game-engine/progression"
+import { compareAttemptsForCampaign } from "@/lib/game-engine/scoring"
 
 type DynamoItem = Record<string, unknown>
 
@@ -71,6 +72,15 @@ function emailPk(email: string) {
 
 function scoreSort(score: number) {
   return String(999_999_999 - Math.max(0, Math.floor(score))).padStart(9, "0")
+}
+
+function runtimeForSubmission(submission: CustomGameSubmission): "beat_tiles" | "brand_rush_runner" {
+  const style = submission.desiredGameStyle?.toLowerCase() ?? ""
+  const title = submission.gameTitle.toLowerCase()
+  if (style.includes("beat") || style.includes("music tile") || title.includes("beat")) {
+    return "beat_tiles"
+  }
+  return "brand_rush_runner"
 }
 
 function itemCampaign(item: DynamoItem | undefined): Campaign | null {
@@ -468,7 +478,7 @@ export function createDynamoDB(): BrandQuestDB {
       const previousAttempts = await getAttemptsForCampaign(attempt.campaignId)
       const ranked = [...previousAttempts, attempt]
         .filter((a) => a.validationStatus === "validated")
-        .sort((a, b) => b.score - a.score || a.durationSeconds - b.durationSeconds)
+        .sort(compareAttemptsForCampaign(campaign))
       const rank = ranked.findIndex((a) => a.attemptId === attempt.attemptId) + 1
       const isWin = rank > 0 && rank <= campaign.numberOfWinners
 
@@ -609,7 +619,7 @@ export function createDynamoDB(): BrandQuestDB {
       const campaign = await this.getCampaign(campaignId)
       const attempts = (await getAttemptsForCampaign(campaignId))
         .filter((attempt) => attempt.validationStatus === "validated")
-        .sort((a, b) => b.score - a.score || a.durationSeconds - b.durationSeconds)
+        .sort(campaign ? compareAttemptsForCampaign(campaign) : (a, b) => b.score - a.score || a.durationSeconds - b.durationSeconds)
         .slice(0, limit)
 
       return attempts.map((attempt, index) => ({
@@ -618,6 +628,10 @@ export function createDynamoDB(): BrandQuestDB {
         playerName: attempt.playerName,
         score: attempt.score,
         durationSeconds: attempt.durationSeconds,
+        accuracy: attempt.accuracy,
+        maxCombo: attempt.maxCombo,
+        hits: attempt.hits,
+        misses: attempt.misses,
         attemptsUsed: attempt.attemptNumber,
         validationStatus: attempt.validationStatus,
         submittedAt: attempt.submittedAt,
@@ -784,6 +798,10 @@ export function createDynamoDB(): BrandQuestDB {
       const updated: CustomGameSubmission = {
         ...existing,
         status,
+        approvedCampaignId:
+          status === "approved"
+            ? `custom_${existing.submissionId}`
+            : existing.approvedCampaignId,
         reviewNotes: [...existing.reviewNotes, note],
         updatedAt: new Date().toISOString(),
       }
@@ -821,8 +839,12 @@ export function createDynamoDB(): BrandQuestDB {
       }
       if (updated.status === "approved") {
         const now = new Date().toISOString()
+        const runtime = runtimeForSubmission(updated)
+        const campaignId = `custom_${updated.submissionId}`
+        const isBeatTiles = runtime === "beat_tiles"
+        const scoringRule = isBeatTiles ? "combo" : updated.scoringMethod
         const campaign: Campaign = {
-          campaignId: `custom_${updated.submissionId}`,
+          campaignId,
           creatorId: updated.creatorId,
           title: updated.gameTitle,
           previewTitle: updated.gameTitle,
@@ -847,9 +869,21 @@ export function createDynamoDB(): BrandQuestDB {
           templateConfig: {
             instructions: updated.instructions,
             timeLimitSeconds: Math.min(120, Math.max(10, updated.timeLimitSeconds)),
-            scoringRule: updated.scoringMethod,
+            scoringRule,
             maxPossibleScore: updated.maxPossibleScore,
             externalDemoUrl: updated.externalDemoUrl,
+            customRuntime: runtime,
+            primaryMetric: updated.primaryMetric ?? "score",
+            sortDirection: updated.sortDirection ?? "desc",
+            tieBreakers:
+              updated.tieBreakers ??
+              (isBeatTiles
+                ? ["accuracy", "combo", "submittedAt"]
+                : ["submittedAt"]),
+            beatTilesDurationSeconds: Math.min(120, Math.max(15, updated.timeLimitSeconds)),
+            beatTilesSpawnMs: 650,
+            beatTilesPerfectWindow: 0.07,
+            beatTilesGreatWindow: 0.16,
             runnerDurationSeconds: Math.min(120, Math.max(10, updated.timeLimitSeconds)),
             runnerTokenValue: 25,
             minDurationSeconds: 1,

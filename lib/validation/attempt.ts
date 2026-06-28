@@ -14,6 +14,11 @@ export const submitAttemptSchema = z.object({
   attemptId: z.string().min(8, "attemptId is required"),
   score: z.number().finite("Score must be a number").min(0),
   durationSeconds: z.number().finite().min(0).max(3600),
+  accuracy: z.number().finite().min(0).max(100).optional(),
+  combo: z.number().int().min(0).max(1_000_000).optional(),
+  maxCombo: z.number().int().min(0).max(1_000_000).optional(),
+  hits: z.number().int().min(0).max(1_000_000).optional(),
+  misses: z.number().int().min(0).max(1_000_000).optional(),
 })
 
 export type SubmitAttemptInput = z.infer<typeof submitAttemptSchema>

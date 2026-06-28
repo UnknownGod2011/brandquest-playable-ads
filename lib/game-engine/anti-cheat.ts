@@ -16,6 +16,10 @@ export interface ValidationContext {
   campaign: Campaign
   score: number
   durationSeconds: number
+  accuracy?: number
+  maxCombo?: number
+  hits?: number
+  misses?: number
   existingAttemptCount: number
   isDuplicateAttemptId: boolean
   now?: Date
@@ -87,6 +91,22 @@ export function validateAttempt(ctx: ValidationContext): ValidationResult {
   if (durationSeconds > 0 && score / durationSeconds > maxScorePerSecond) {
     flags.push("impossible_score")
     reasons.push("Score accumulated faster than the game allows.")
+  }
+
+  if (
+    typeof ctx.accuracy === "number" &&
+    (!Number.isFinite(ctx.accuracy) || ctx.accuracy < 0 || ctx.accuracy > 100)
+  ) {
+    flags.push("impossible_score")
+    reasons.push("Accuracy metric is outside the valid range.")
+  }
+
+  const hits = ctx.hits ?? 0
+  const misses = ctx.misses ?? 0
+  const maxCombo = ctx.maxCombo ?? 0
+  if (maxCombo > hits || hits + misses > 5_000) {
+    flags.push("impossible_score")
+    reasons.push("Submitted timing metrics are not plausible.")
   }
 
   if (flags.length > 0) {

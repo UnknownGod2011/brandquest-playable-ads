@@ -132,7 +132,7 @@ function CampaignRow({ campaign }: { campaign: Campaign }) {
       <TableCell>
         <div className="flex items-center justify-end gap-1">
           <Button
-            render={<Link href={`/creator/campaigns/${campaign.campaignId}/analytics`} />}
+            render={<Link href={`/creator/analytics/${campaign.campaignId}`} />}
             variant="ghost"
             size="sm"
           >

@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="620" viewBox="0 0 1200 620" role="img" aria-labelledby="title desc">
+  <title id="title">BrandQuest core data flow</title>
+  <desc id="desc">Creator creates a campaign, players play, server validates attempts, DynamoDB stores attempts, and leaderboards, player stats, and analytics update.</desc>
+  <defs>
+    <style>
+      .bg{fill:#07111f}
+      .box{fill:#0e1729;stroke:#475569;stroke-width:2}
+      .blue{fill:#1e3a8a;stroke:#60a5fa;stroke-width:2}
+      .green{fill:#064e3b;stroke:#34d399;stroke-width:2}
+      .gold{fill:#713f12;stroke:#facc15;stroke-width:2}
+      .text{font-family:Inter,Segoe UI,Arial,sans-serif;fill:#e5e7eb;font-size:20px;font-weight:700}
+      .small{font-family:Inter,Segoe UI,Arial,sans-serif;fill:#cbd5e1;font-size:14px}
+      .line{stroke:#64748b;stroke-width:3;fill:none;marker-end:url(#arrow)}
+    </style>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#64748b"/>
+    </marker>
+  </defs>
+  <rect class="bg" width="1200" height="620"/>
+  <text x="50" y="54" class="text" font-size="30">Core Data Flow</text>
+  <text x="50" y="84" class="small">Every score and analytics metric comes from server-validated DynamoDB records</text>
+
+  <rect class="blue" x="50" y="150" width="210" height="90" rx="14"/>
+  <text x="82" y="187" class="text">Creator</text>
+  <text x="82" y="214" class="small">Creates live campaign</text>
+
+  <rect class="green" x="335" y="150" width="220" height="90" rx="14"/>
+  <text x="370" y="187" class="text">DynamoDB</text>
+  <text x="370" y="214" class="small">Campaign record</text>
+
+  <rect class="box" x="630" y="150" width="220" height="90" rx="14"/>
+  <text x="665" y="187" class="text">Player Arcade</text>
+  <text x="665" y="214" class="small">Reads live campaigns</text>
+
+  <rect class="box" x="925" y="150" width="220" height="90" rx="14"/>
+  <text x="960" y="187" class="text">Playable Game</text>
+  <text x="960" y="214" class="small">Beat Tiles / templates</text>
+
+  <rect class="gold" x="335" y="345" width="220" height="98" rx="14"/>
+  <text x="365" y="382" class="text">Validation</text>
+  <text x="365" y="410" class="small">Auth, attempts, score limits</text>
+
+  <rect class="green" x="630" y="345" width="220" height="98" rx="14"/>
+  <text x="665" y="382" class="text">Attempt Write</text>
+  <text x="665" y="410" class="small">Attempt + leaderboard item</text>
+
+  <rect class="box" x="925" y="345" width="220" height="98" rx="14"/>
+  <text x="957" y="382" class="text">Product Views</text>
+  <text x="957" y="410" class="small">Leaderboard, stats, analytics</text>
+
+  <path class="line" d="M260 195 H335"/>
+  <path class="line" d="M555 195 H630"/>
+  <path class="line" d="M850 195 H925"/>
+  <path class="line" d="M1035 240 V288 H445 V345"/>
+  <path class="line" d="M555 394 H630"/>
+  <path class="line" d="M850 394 H925"/>
+</svg>

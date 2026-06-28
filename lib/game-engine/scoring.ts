@@ -7,7 +7,13 @@
  * (see lib/game-engine/anti-cheat.ts).
  */
 
-import type { ScoringType, TemplateConfig } from "@/lib/db/types"
+import type {
+  Campaign,
+  GameAttempt,
+  LeaderboardMetric,
+  ScoringType,
+  TemplateConfig,
+} from "@/lib/db/types"
 
 export interface NormalizedScoreInput {
   raw: number
@@ -41,6 +47,9 @@ export function maxPlausibleScore(config: TemplateConfig): number {
   }
   if (config.runnerDurationSeconds) {
     return Math.max(1, config.runnerDurationSeconds) * 100
+  }
+  if (config.beatTilesDurationSeconds) {
+    return Math.max(1, config.beatTilesDurationSeconds) * 150
   }
   return 10_000
 }
@@ -110,7 +119,84 @@ export function scoreBrandRushRunner(
   )
 }
 
+/** Beat Tiles: timing accuracy plus combo pressure. */
+export function scoreBeatTiles({
+  perfectHits,
+  greatHits,
+  misses,
+  maxCombo,
+}: {
+  perfectHits: number
+  greatHits: number
+  misses: number
+  maxCombo: number
+}): number {
+  return Math.max(
+    0,
+    perfectHits * 120 + greatHits * 75 + maxCombo * 12 - misses * 35,
+  )
+}
+
+export function accuracyPercent(hits: number, misses: number): number {
+  const total = hits + misses
+  if (total <= 0) return 0
+  return Math.round((hits / total) * 1000) / 10
+}
+
 /** Whether higher or lower values are better for ranking purposes. */
 export function isHigherBetter(scoringType: ScoringType): boolean {
   return scoringType !== "time"
+}
+
+function metricValue(attempt: GameAttempt, metric: LeaderboardMetric): number {
+  switch (metric) {
+    case "accuracy":
+      return attempt.accuracy ?? 0
+    case "completionTime":
+      return attempt.durationSeconds
+    case "combo":
+      return attempt.maxCombo ?? attempt.combo ?? 0
+    case "submittedAt":
+      return new Date(attempt.submittedAt).getTime()
+    case "score":
+    default:
+      return attempt.score
+  }
+}
+
+function directionForMetric(
+  metric: LeaderboardMetric,
+  configuredDirection?: "asc" | "desc",
+): "asc" | "desc" {
+  if (configuredDirection && metric !== "submittedAt") return configuredDirection
+  if (metric === "completionTime" || metric === "submittedAt") return "asc"
+  return "desc"
+}
+
+export function leaderboardMetricsForCampaign(campaign: Campaign): LeaderboardMetric[] {
+  const primary =
+    campaign.templateConfig.primaryMetric ??
+    (campaign.templateConfig.scoringRule === "time" ? "completionTime" : "score")
+  const tieBreakers = campaign.templateConfig.tieBreakers ?? ["submittedAt"]
+  return [primary, ...tieBreakers.filter((metric) => metric !== primary)]
+}
+
+export function compareAttemptsForCampaign(campaign: Campaign) {
+  const metrics = leaderboardMetricsForCampaign(campaign)
+  const primary = metrics[0] ?? "score"
+  const primaryDirection = campaign.templateConfig.sortDirection
+
+  return (a: GameAttempt, b: GameAttempt): number => {
+    for (const metric of metrics) {
+      const direction = directionForMetric(
+        metric,
+        metric === primary ? primaryDirection : undefined,
+      )
+      const av = metricValue(a, metric)
+      const bv = metricValue(b, metric)
+      if (av === bv) continue
+      return direction === "asc" ? av - bv : bv - av
+    }
+    return new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime()
+  }
 }

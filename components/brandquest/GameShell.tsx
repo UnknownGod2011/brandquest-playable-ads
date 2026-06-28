@@ -17,10 +17,12 @@ import { cn, generateId } from "@/lib/utils"
 import {
   scoreBrandQuiz,
   scoreBrandRushRunner,
+  scoreBeatTiles,
   scoreMemoryMatch,
   scorePatternRecall,
   scoreReactionTap,
   scoreWordScramble,
+  accuracyPercent,
 } from "@/lib/game-engine/scoring"
 
 interface SubmitResponse {
@@ -34,17 +36,31 @@ interface SubmitResponse {
 
 type Phase = "intro" | "playing" | "submitting" | "result"
 
+interface SubmitMetrics {
+  durationSeconds?: number
+  accuracy?: number
+  combo?: number
+  maxCombo?: number
+  hits?: number
+  misses?: number
+}
+
+interface BeatTile {
+  id: string
+  lane: number
+  y: number
+}
+
 export function GameShell({ campaign }: { campaign: Campaign }) {
   const [phase, setPhase] = useState<Phase>("intro")
   const [result, setResult] = useState<SubmitResponse | null>(null)
   const startedAt = useRef<number>(0)
 
   const submit = useCallback(
-    async (score: number) => {
-      const durationSeconds = Math.max(
-        1,
-        Math.round((Date.now() - startedAt.current) / 1000),
-      )
+    async (score: number, metrics: SubmitMetrics = {}) => {
+      const durationSeconds =
+        metrics.durationSeconds ??
+        Math.max(1, Math.round((Date.now() - startedAt.current) / 1000))
       setPhase("submitting")
       try {
         const res = await fetch("/api/attempts", {
@@ -55,6 +71,11 @@ export function GameShell({ campaign }: { campaign: Campaign }) {
             attemptId: generateId("att"),
             score,
             durationSeconds,
+            accuracy: metrics.accuracy,
+            combo: metrics.combo,
+            maxCombo: metrics.maxCombo,
+            hits: metrics.hits,
+            misses: metrics.misses,
           }),
         })
         const data = (await res.json()) as SubmitResponse
@@ -202,7 +223,7 @@ function ActiveGame({
   onFinish,
 }: {
   campaign: Campaign
-  onFinish: (score: number) => void
+  onFinish: (score: number, metrics?: SubmitMetrics) => void
 }) {
   switch (campaign.templateType) {
     case "brand_quiz":
@@ -215,8 +236,14 @@ function ActiveGame({
       return <WordScrambleGame campaign={campaign} onFinish={onFinish} />
     case "pattern_recall":
       return <PatternRecallGame campaign={campaign} onFinish={onFinish} />
+    case "beat_tiles":
+      return <BeatTilesGame campaign={campaign} onFinish={onFinish} />
     case "custom":
-      return <BrandRushRunnerGame campaign={campaign} onFinish={onFinish} />
+      return campaign.templateConfig.customRuntime === "beat_tiles" ? (
+        <BeatTilesGame campaign={campaign} onFinish={onFinish} />
+      ) : (
+        <BrandRushRunnerGame campaign={campaign} onFinish={onFinish} />
+      )
     default:
       return <ComingSoonGame />
   }
@@ -235,10 +262,61 @@ function defaultInstructions(type: string): string {
     case "pattern_recall":
       return "Watch the sequence, then repeat it from memory."
     case "custom":
-      return "Move between lanes, collect brand tokens, and avoid blockers."
+      return "Play the approved first-party custom game runtime. Uploaded code is never executed."
+    case "beat_tiles":
+      return "Tap A, S, D, F or click lanes as music tiles reach the hit zone. Build combo and accuracy."
     default:
       return "This template is not playable yet."
   }
+}
+
+function useCountdown(seconds: number, onExpire: () => void) {
+  const [remaining, setRemaining] = useState(seconds)
+  const onExpireRef = useRef(onExpire)
+  const expired = useRef(false)
+
+  useEffect(() => {
+    onExpireRef.current = onExpire
+  }, [onExpire])
+
+  useEffect(() => {
+    setRemaining(seconds)
+    expired.current = false
+  }, [seconds])
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setRemaining((value) => {
+        const next = Math.max(0, value - 1)
+        if (next === 0 && !expired.current) {
+          expired.current = true
+          window.setTimeout(() => onExpireRef.current(), 0)
+        }
+        return next
+      })
+    }, 1000)
+    return () => window.clearInterval(interval)
+  }, [])
+
+  return remaining
+}
+
+function TimerBar({ remaining, total }: { remaining: number; total: number }) {
+  const pct = Math.max(0, Math.min(100, (remaining / Math.max(1, total)) * 100))
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <span>Timer</span>
+        <span className="tabular-nums">{remaining}s</span>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-secondary">
+        <div
+          className="h-full rounded-full bg-primary transition-all"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  )
 }
 
 function BrandQuizGame({
@@ -246,13 +324,15 @@ function BrandQuizGame({
   onFinish,
 }: {
   campaign: Campaign
-  onFinish: (score: number) => void
+  onFinish: (score: number, metrics?: SubmitMetrics) => void
 }) {
   const questions = campaign.templateConfig.questions ?? []
   const timeLimit = campaign.templateConfig.timeLimitSeconds ?? 60
   const [index, setIndex] = useState(0)
   const [correct, setCorrect] = useState(0)
   const startedAt = useRef(Date.now())
+  const finished = useRef(false)
+  const remaining = useCountdown(timeLimit, () => finish(correct))
 
   if (questions.length === 0) {
     return (
@@ -264,13 +344,20 @@ function BrandQuizGame({
 
   const q = questions[index]
 
+  function finish(correctCount: number) {
+    if (finished.current) return
+    finished.current = true
+    const duration = Math.max(1, (Date.now() - startedAt.current) / 1000)
+    onFinish(scoreBrandQuiz(correctCount, duration, timeLimit))
+  }
+
   function answer(optionIndex: number) {
+    if (finished.current) return
     const isCorrect = optionIndex === q.correctIndex
     const nextCorrect = correct + (isCorrect ? 1 : 0)
     setCorrect(nextCorrect)
     if (index + 1 >= questions.length) {
-      const duration = Math.max(1, (Date.now() - startedAt.current) / 1000)
-      onFinish(scoreBrandQuiz(nextCorrect, duration, timeLimit))
+      finish(nextCorrect)
     } else {
       setIndex(index + 1)
     }
@@ -283,6 +370,9 @@ function BrandQuizGame({
           Question {index + 1} / {questions.length}
         </span>
         <span>Correct: {correct}</span>
+      </div>
+      <div className="mb-4">
+        <TimerBar remaining={remaining} total={timeLimit} />
       </div>
       <h3 className="text-lg font-semibold text-balance">{q.prompt}</h3>
       <div className="mt-4 grid gap-2">
@@ -305,12 +395,15 @@ function ReactionTapGame({
   onFinish,
 }: {
   campaign: Campaign
-  onFinish: (score: number) => void
+  onFinish: (score: number, metrics?: SubmitMetrics) => void
 }) {
   const targets = campaign.templateConfig.reactionTargets ?? 15
+  const timeLimit = campaign.templateConfig.timeLimitSeconds ?? 30
   const [hits, setHits] = useState(0)
   const [pos, setPos] = useState({ x: 50, y: 50 })
   const misses = useRef(0)
+  const finished = useRef(false)
+  const remaining = useCountdown(timeLimit, () => finish(hits))
 
   const moveTarget = useCallback(() => {
     setPos({
@@ -319,11 +412,22 @@ function ReactionTapGame({
     })
   }, [])
 
+  function finish(finalHits: number) {
+    if (finished.current) return
+    finished.current = true
+    onFinish(scoreReactionTap(finalHits, misses.current), {
+      hits: finalHits,
+      misses: misses.current,
+      accuracy: accuracyPercent(finalHits, misses.current),
+    })
+  }
+
   function hit() {
+    if (finished.current) return
     const next = hits + 1
     setHits(next)
     if (next >= targets) {
-      onFinish(scoreReactionTap(next, misses.current))
+      finish(next)
     } else {
       moveTarget()
     }
@@ -337,9 +441,13 @@ function ReactionTapGame({
         </span>
         <span>Tap the glowing target</span>
       </div>
+      <div className="mb-4">
+        <TimerBar remaining={remaining} total={timeLimit} />
+      </div>
       <div
         className="relative h-72 w-full overflow-hidden rounded-xl bg-arcade-grid"
         onClick={() => {
+          if (finished.current) return
           misses.current += 1
         }}
       >
@@ -364,11 +472,13 @@ function MemoryMatchGame({
   onFinish,
 }: {
   campaign: Campaign
-  onFinish: (score: number) => void
+  onFinish: (score: number, metrics?: SubmitMetrics) => void
 }) {
   const pairs = campaign.templateConfig.memoryPairs ?? 6
+  const timeLimit = campaign.templateConfig.timeLimitSeconds ?? 90
   const startedAt = useRef(Date.now())
   const flipsRef = useRef(0)
+  const finished = useRef(false)
 
   const deck = useMemo(() => {
     const symbols = SYMBOL_POOL.slice(0, pairs)
@@ -383,9 +493,20 @@ function MemoryMatchGame({
   const [flipped, setFlipped] = useState<number[]>([])
   const [matched, setMatched] = useState<number[]>([])
   const [busy, setBusy] = useState(false)
+  const remaining = useCountdown(timeLimit, () => finish(matched.length))
+
+  function finish(matchedCards: number) {
+    if (finished.current) return
+    finished.current = true
+    const duration = Math.max(1, (Date.now() - startedAt.current) / 1000)
+    const matchedPairs = Math.floor(matchedCards / 2)
+    onFinish(matchedPairs > 0 ? scoreMemoryMatch(matchedPairs, flipsRef.current, duration) : 0, {
+      durationSeconds: Math.round(duration),
+    })
+  }
 
   function flip(id: number) {
-    if (busy || flipped.includes(id) || matched.includes(id)) return
+    if (finished.current || busy || flipped.includes(id) || matched.includes(id)) return
     const next = [...flipped, id]
     flipsRef.current += 1
     setFlipped(next)
@@ -398,8 +519,7 @@ function MemoryMatchGame({
           const nextMatched = [...matched, a, b]
           setMatched(nextMatched)
           if (nextMatched.length === deck.length) {
-            const duration = Math.max(1, (Date.now() - startedAt.current) / 1000)
-            onFinish(scoreMemoryMatch(pairs, flipsRef.current, duration))
+            finish(nextMatched.length)
           }
         }
         setFlipped([])
@@ -417,6 +537,9 @@ function MemoryMatchGame({
           Pairs: {matched.length / 2} / {pairs}
         </span>
         <span>Flips: {flipsRef.current}</span>
+      </div>
+      <div className="mb-4">
+        <TimerBar remaining={remaining} total={timeLimit} />
       </div>
       <div className={cn("grid gap-2", cols)}>
         {deck.map((card, id) => {
@@ -448,7 +571,7 @@ function WordScrambleGame({
   onFinish,
 }: {
   campaign: Campaign
-  onFinish: (score: number) => void
+  onFinish: (score: number, metrics?: SubmitMetrics) => void
 }) {
   const words = useMemo(() => {
     const configured = campaign.templateConfig.scrambleWords?.filter(Boolean)
@@ -461,10 +584,25 @@ function WordScrambleGame({
   const [solved, setSolved] = useState(0)
   const [answer, setAnswer] = useState("")
   const [feedback, setFeedback] = useState("")
+  const finished = useRef(false)
+  const remaining = useCountdown(timeLimit, () => finish(solved))
 
   const scrambled = useMemo(() => scramble(words[index] ?? ""), [words, index])
 
+  function finish(finalSolved: number) {
+    if (finished.current) return
+    finished.current = true
+    const duration = Math.max(1, (Date.now() - startedAt.current) / 1000)
+    onFinish(scoreWordScramble(finalSolved, words.length, duration, timeLimit), {
+      durationSeconds: Math.round(duration),
+      accuracy: accuracyPercent(finalSolved, words.length - finalSolved),
+      hits: finalSolved,
+      misses: words.length - finalSolved,
+    })
+  }
+
   function submitWord() {
+    if (finished.current) return
     const correct = answer.trim().toUpperCase() === words[index]
     const nextSolved = solved + (correct ? 1 : 0)
     setFeedback(correct ? "Correct" : `Answer: ${words[index]}`)
@@ -472,8 +610,7 @@ function WordScrambleGame({
     setAnswer("")
     setTimeout(() => {
       if (index + 1 >= words.length) {
-        const duration = Math.max(1, (Date.now() - startedAt.current) / 1000)
-        onFinish(scoreWordScramble(nextSolved, words.length, duration, timeLimit))
+        finish(nextSolved)
       } else {
         setFeedback("")
         setIndex((current) => current + 1)
@@ -488,6 +625,9 @@ function WordScrambleGame({
           Word {index + 1} / {words.length}
         </span>
         <span>Solved: {solved}</span>
+      </div>
+      <div className="mb-4">
+        <TimerBar remaining={remaining} total={timeLimit} />
       </div>
       <div className="rounded-xl bg-secondary/60 p-6 text-center">
         <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Unscramble</p>
@@ -519,15 +659,18 @@ function PatternRecallGame({
   onFinish,
 }: {
   campaign: Campaign
-  onFinish: (score: number) => void
+  onFinish: (score: number, metrics?: SubmitMetrics) => void
 }) {
   const patternLength = campaign.templateConfig.patternLength ?? 4
   const rounds = campaign.templateConfig.patternRounds ?? 5
+  const timeLimit = campaign.templateConfig.timeLimitSeconds ?? 90
   const [round, setRound] = useState(1)
   const [sequence, setSequence] = useState<number[]>(() => makeSequence(patternLength, 1))
   const [input, setInput] = useState<number[]>([])
   const [showing, setShowing] = useState(true)
   const [mistakes, setMistakes] = useState(0)
+  const finished = useRef(false)
+  const remaining = useCountdown(timeLimit, () => finish(round - 1, mistakes + 1))
 
   useEffect(() => {
     setShowing(true)
@@ -538,18 +681,28 @@ function PatternRecallGame({
     return () => clearTimeout(timeout)
   }, [sequence])
 
+  function finish(roundsCompleted: number, finalMistakes: number) {
+    if (finished.current) return
+    finished.current = true
+    onFinish(scorePatternRecall(roundsCompleted, finalMistakes), {
+      combo: roundsCompleted,
+      maxCombo: roundsCompleted,
+      misses: finalMistakes,
+    })
+  }
+
   function press(tile: number) {
-    if (showing) return
+    if (finished.current || showing) return
     const next = [...input, tile]
     setInput(next)
     const expected = sequence[next.length - 1]
     if (tile !== expected) {
-      onFinish(scorePatternRecall(round - 1, mistakes + 1))
+      finish(round - 1, mistakes + 1)
       return
     }
     if (next.length === sequence.length) {
       if (round >= rounds) {
-        onFinish(scorePatternRecall(rounds, mistakes))
+        finish(rounds, mistakes)
       } else {
         const nextRound = round + 1
         setRound(nextRound)
@@ -565,6 +718,9 @@ function PatternRecallGame({
           Round {round} / {rounds}
         </span>
         <span>{showing ? "Memorize the sequence" : "Repeat it"}</span>
+      </div>
+      <div className="mb-4">
+        <TimerBar remaining={remaining} total={timeLimit} />
       </div>
       <div className="grid grid-cols-2 gap-3">
         {[0, 1, 2, 3].map((tile) => {
@@ -591,12 +747,271 @@ function PatternRecallGame({
   )
 }
 
+function BeatTilesGame({
+  campaign,
+  onFinish,
+}: {
+  campaign: Campaign
+  onFinish: (score: number, metrics?: SubmitMetrics) => void
+}) {
+  const duration = campaign.templateConfig.beatTilesDurationSeconds ??
+    campaign.templateConfig.timeLimitSeconds ??
+    45
+  const spawnMs = campaign.templateConfig.beatTilesSpawnMs ?? 650
+  const perfectWindow = campaign.templateConfig.beatTilesPerfectWindow ?? 0.07
+  const greatWindow = campaign.templateConfig.beatTilesGreatWindow ?? 0.16
+  const [tiles, setTiles] = useState<BeatTile[]>([])
+  const [remainingMs, setRemainingMs] = useState(duration * 1000)
+  const [score, setScore] = useState(0)
+  const [combo, setCombo] = useState(0)
+  const [maxCombo, setMaxCombo] = useState(0)
+  const [perfectHits, setPerfectHits] = useState(0)
+  const [greatHits, setGreatHits] = useState(0)
+  const [misses, setMisses] = useState(0)
+  const [feedback, setFeedback] = useState("Ready")
+  const [ended, setEnded] = useState(false)
+  const lastSpawn = useRef(0)
+  const submitted = useRef(false)
+
+  const hits = perfectHits + greatHits
+  const accuracy = accuracyPercent(hits, misses)
+  const progress = Math.max(0, Math.min(100, (remainingMs / Math.max(1, duration * 1000)) * 100))
+
+  const tapLane = useCallback(
+    (lane: number) => {
+      if (ended) return
+      setTiles((current) => {
+        const candidates = current
+          .filter((tile) => tile.lane === lane)
+          .map((tile) => ({
+            tile,
+            distance: Math.abs(tile.y - 82),
+          }))
+          .sort((a, b) => a.distance - b.distance)
+        const best = candidates[0]
+        if (!best || best.distance > greatWindow * 100) {
+          setCombo(0)
+          setMisses((value) => value + 1)
+          setFeedback("Miss")
+          return current
+        }
+
+        const isPerfect = best.distance <= perfectWindow * 100
+        const points = isPerfect ? 120 : 75
+        setCombo((value) => {
+          const nextCombo = value + 1
+          setMaxCombo((currentMax) => Math.max(currentMax, nextCombo))
+          setScore((currentScore) => currentScore + points + Math.min(50, nextCombo * 4))
+          return nextCombo
+        })
+        if (isPerfect) setPerfectHits((value) => value + 1)
+        else setGreatHits((value) => value + 1)
+        setFeedback(isPerfect ? "Perfect" : "Great")
+        return current.filter((tile) => tile.id !== best.tile.id)
+      })
+    },
+    [ended, greatWindow, perfectWindow],
+  )
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const keyMap: Record<string, number> = {
+        a: 0,
+        ArrowLeft: 0,
+        s: 1,
+        ArrowDown: 1,
+        d: 2,
+        ArrowUp: 2,
+        f: 3,
+        ArrowRight: 3,
+      }
+      const lane = keyMap[event.key]
+      if (lane != null) {
+        event.preventDefault()
+        tapLane(lane)
+      }
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [tapLane])
+
+  useEffect(() => {
+    if (ended) return
+    const interval = window.setInterval(() => {
+      const stepMs = 80
+      setRemainingMs((value) => {
+        const next = Math.max(0, value - stepMs)
+        if (next === 0) setEnded(true)
+        return next
+      })
+      lastSpawn.current += stepMs
+      setTiles((current) => {
+        let next = current
+          .map((tile) => ({ ...tile, y: tile.y + 2.8 }))
+          .filter((tile) => {
+            if (tile.y <= 104) return true
+            setCombo(0)
+            setMisses((value) => value + 1)
+            setFeedback("Miss")
+            return false
+          })
+        if (lastSpawn.current >= spawnMs) {
+          lastSpawn.current = 0
+          next = [
+            ...next,
+            {
+              id: generateId("tile"),
+              lane: Math.floor(Math.random() * 4),
+              y: -12,
+            },
+          ]
+        }
+        return next
+      })
+    }, 80)
+    return () => window.clearInterval(interval)
+  }, [ended, spawnMs])
+
+  useEffect(() => {
+    const runtimeWindow = window as Window & {
+      render_game_to_text?: () => string
+      advanceTime?: (ms: number) => void
+    }
+    runtimeWindow.render_game_to_text = () =>
+      JSON.stringify({
+        game: "Beat Tiles",
+        brand: campaign.brandName,
+        lanes: 4,
+        controls: "A S D F or lane click",
+        timerMs: remainingMs,
+        score,
+        combo,
+        maxCombo,
+        hits,
+        misses,
+        feedback,
+        tiles,
+        coordinateSystem: "lane 0-3 left to right, y 0 top to 100 bottom",
+      })
+    runtimeWindow.advanceTime = (ms: number) => {
+      setRemainingMs((value) => Math.max(0, value - Math.max(0, ms)))
+    }
+    return () => {
+      delete runtimeWindow.render_game_to_text
+      delete runtimeWindow.advanceTime
+    }
+  }, [campaign.brandName, combo, feedback, hits, maxCombo, misses, remainingMs, score, tiles])
+
+  const finalScore = Math.max(
+    score,
+    scoreBeatTiles({ perfectHits, greatHits, misses, maxCombo }),
+  )
+
+  function submitFinal() {
+    if (submitted.current) return
+    submitted.current = true
+    onFinish(finalScore, {
+      durationSeconds: duration,
+      accuracy,
+      combo,
+      maxCombo,
+      hits,
+      misses,
+    })
+  }
+
+  if (ended) {
+    return (
+      <div className="space-y-5">
+        <div className="rounded-2xl bg-[radial-gradient(circle_at_top,_rgba(29,185,84,0.25),_transparent_45%),linear-gradient(135deg,_#07130d,_#101827)] p-6 text-center ring-1 ring-emerald-400/30">
+          <p className="text-xs uppercase tracking-[0.2em] text-emerald-300">
+            {campaign.brandName}
+          </p>
+          <h3 className="mt-2 text-2xl font-black">Beat Tiles complete</h3>
+          <p className="mt-3 text-4xl font-black tabular-nums text-emerald-300">
+            {finalScore.toLocaleString()}
+          </p>
+          <div className="mt-5 grid gap-2 text-sm sm:grid-cols-4">
+            <Metric label="Accuracy" value={`${accuracy}%`} />
+            <Metric label="Max combo" value={maxCombo.toLocaleString()} />
+            <Metric label="Hits" value={hits.toLocaleString()} />
+            <Metric label="Misses" value={misses.toLocaleString()} />
+          </div>
+        </div>
+        <Button className="w-full" onClick={submitFinal}>
+          Submit score to leaderboard
+        </Button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+        <span>A S D F or click lanes</span>
+        <span className="tabular-nums">{Math.ceil(remainingMs / 1000)}s left</span>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-secondary">
+        <div
+          className="h-full rounded-full bg-emerald-400 transition-all"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+      <div className="grid gap-3 sm:grid-cols-4">
+        <Metric label="Score" value={score.toLocaleString()} />
+        <Metric label="Combo" value={combo.toLocaleString()} />
+        <Metric label="Accuracy" value={`${accuracy}%`} />
+        <Metric label="Feedback" value={feedback} />
+      </div>
+      <div className="relative h-[420px] overflow-hidden rounded-2xl bg-[radial-gradient(circle_at_top,_rgba(29,185,84,0.18),_transparent_45%),linear-gradient(180deg,_#08120d,_#121522)] p-3 ring-1 ring-emerald-400/30">
+        <div className="pointer-events-none absolute inset-x-3 top-[78%] h-12 rounded-xl border border-emerald-300/60 bg-emerald-300/10" />
+        <div className="grid h-full grid-cols-4 gap-2">
+          {[0, 1, 2, 3].map((lane) => (
+            <button
+              key={lane}
+              onClick={() => tapLane(lane)}
+              className="relative overflow-hidden rounded-xl border border-white/10 bg-white/[0.03] transition-colors hover:bg-emerald-400/10"
+              aria-label={`Tap Beat Tiles lane ${lane + 1}`}
+            >
+              <span className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-background/70 px-2 py-1 text-xs font-bold text-emerald-200">
+                {"ASDF"[lane]}
+              </span>
+              {tiles
+                .filter((tile) => tile.lane === lane)
+                .map((tile) => (
+                  <span
+                    key={tile.id}
+                    className="absolute left-1/2 flex h-12 w-[72%] -translate-x-1/2 items-center justify-center rounded-xl bg-emerald-400 text-sm font-black text-slate-950 shadow-[0_0_24px_rgba(52,211,153,0.65)]"
+                    style={{ top: `${tile.y}%` }}
+                  >
+                    ♪
+                  </span>
+                ))}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl bg-secondary/60 p-3 text-center">
+      <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+        {label}
+      </p>
+      <p className="mt-1 font-bold tabular-nums">{value}</p>
+    </div>
+  )
+}
+
 function BrandRushRunnerGame({
   campaign,
   onFinish,
 }: {
   campaign: Campaign
-  onFinish: (score: number) => void
+  onFinish: (score: number, metrics?: SubmitMetrics) => void
 }) {
   const duration = campaign.templateConfig.runnerDurationSeconds ?? 30
   const tokenValue = campaign.templateConfig.runnerTokenValue ?? 25
@@ -605,6 +1020,7 @@ function BrandRushRunnerGame({
   const [tokens, setTokens] = useState(0)
   const [avoided, setAvoided] = useState(0)
   const [hit, setHit] = useState(false)
+  const finished = useRef(false)
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -617,8 +1033,16 @@ function BrandRushRunnerGame({
 
   useEffect(() => {
     if (timeLeft <= 0 || hit) {
+      if (finished.current) return
+      finished.current = true
       const survived = duration - Math.max(0, timeLeft)
-      onFinish(scoreBrandRushRunner(tokens, survived, avoided, tokenValue))
+      onFinish(scoreBrandRushRunner(tokens, survived, avoided, tokenValue), {
+        durationSeconds: Math.max(1, survived),
+        hits: tokens,
+        misses: hit ? 1 : 0,
+        combo: avoided,
+        maxCombo: avoided,
+      })
       return
     }
     const tick = setTimeout(() => {
@@ -635,6 +1059,9 @@ function BrandRushRunnerGame({
       <div className="mb-3 flex items-center justify-between text-xs text-muted-foreground">
         <span>Tokens: {tokens}</span>
         <span>Time left: {Math.max(0, timeLeft)}s</span>
+      </div>
+      <div className="mb-4">
+        <TimerBar remaining={Math.max(0, timeLeft)} total={duration} />
       </div>
       <div className="relative h-72 overflow-hidden rounded-xl bg-arcade-grid p-4">
         <div className="absolute inset-x-6 bottom-5 grid grid-cols-3 gap-3">

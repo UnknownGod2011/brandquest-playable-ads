@@ -83,6 +83,10 @@ export async function POST(req: NextRequest) {
     campaign,
     score: input.score,
     durationSeconds: input.durationSeconds,
+    accuracy: input.accuracy,
+    maxCombo: input.maxCombo,
+    hits: input.hits,
+    misses: input.misses,
     existingAttemptCount,
     isDuplicateAttemptId,
   })
@@ -94,6 +98,11 @@ export async function POST(req: NextRequest) {
     playerName: user.displayName,
     score: input.score,
     durationSeconds: input.durationSeconds,
+    accuracy: input.accuracy,
+    combo: input.combo,
+    maxCombo: input.maxCombo,
+    hits: input.hits,
+    misses: input.misses,
     attemptNumber: existingAttemptCount + 1,
     validationStatus: verdict.status,
     flags: verdict.flags,
@@ -109,21 +118,34 @@ export async function POST(req: NextRequest) {
         type: "attempt_submitted",
         campaignId: campaign.campaignId,
         playerId: user.userId,
-        metadata: { status: verdict.status, score: input.score },
+        metadata: {
+          status: verdict.status,
+          score: input.score,
+          accuracy: input.accuracy ?? 0,
+          maxCombo: input.maxCombo ?? 0,
+        },
       })
       if (verdict.status === "validated") {
         await track({
           type: "score_validated",
           campaignId: campaign.campaignId,
           playerId: user.userId,
-          metadata: { score: input.score },
+          metadata: {
+            score: input.score,
+            accuracy: input.accuracy ?? 0,
+            maxCombo: input.maxCombo ?? 0,
+          },
         })
       }
       await track({
         type: "leaderboard_updated",
         campaignId: campaign.campaignId,
         playerId: user.userId,
-        metadata: { score: input.score },
+        metadata: {
+          score: input.score,
+          accuracy: input.accuracy ?? 0,
+          maxCombo: input.maxCombo ?? 0,
+        },
       })
     } catch {
       return NextResponse.json(

@@ -52,15 +52,28 @@ export const GAME_TEMPLATES: GameTemplate[] = [
   },
   {
     type: "custom",
-    name: "Brand Rush Runner",
+    name: "Approved Custom Game",
     description:
-      "A trusted first-party runner for approved custom-game campaigns. Players collect branded tokens, dodge blockers, and submit scores through the secure score API.",
+      "Trusted first-party runtimes for approved custom-game campaigns. Uploaded JavaScript is never executed.",
     bestUseCase: "Bespoke branded experiences that go beyond templates.",
     estimatedPlayTime: "Varies",
     scoringType: "points",
     difficulty: "medium",
-    dataCaptured: ["score", "duration", "completion"],
-    customizationOptions: ["instructions", "scoring method", "time limit", "reward"],
+    dataCaptured: ["score", "duration", "accuracy", "combo"],
+    customizationOptions: ["first-party runtime", "instructions", "scoring method", "time limit", "reward"],
+    playable: true,
+  },
+  {
+    type: "beat_tiles",
+    name: "Beat Tiles",
+    description:
+      "A rhythm mini-game where players tap falling music tiles with timing accuracy and combo streaks.",
+    bestUseCase: "Music, entertainment, and Gen Z campaigns that need an impressive demo loop.",
+    estimatedPlayTime: "45s",
+    scoringType: "combo",
+    difficulty: "medium",
+    dataCaptured: ["score", "accuracy", "max combo", "hits", "misses"],
+    customizationOptions: ["brand name", "instructions", "time limit", "reward", "leaderboard tie breakers"],
     playable: true,
   },
 

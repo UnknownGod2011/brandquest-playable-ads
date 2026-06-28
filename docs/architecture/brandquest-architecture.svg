@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760" role="img" aria-labelledby="title desc">
+  <title id="title">BrandQuest system architecture</title>
+  <desc id="desc">Players, creators, and admins use a Vercel hosted Next.js app. Server routes validate auth, permissions, scores, and custom game review before writing to a single DynamoDB BrandQuest table.</desc>
+  <defs>
+    <style>
+      .bg{fill:#07111f}
+      .panel{fill:#0e1729;stroke:#334155;stroke-width:2}
+      .accent{fill:#1d4ed8;stroke:#60a5fa;stroke-width:2}
+      .green{fill:#064e3b;stroke:#34d399;stroke-width:2}
+      .purple{fill:#4c1d95;stroke:#a78bfa;stroke-width:2}
+      .warn{fill:#713f12;stroke:#facc15;stroke-width:2}
+      .text{font-family:Inter,Segoe UI,Arial,sans-serif;fill:#e5e7eb;font-size:20px;font-weight:700}
+      .small{font-family:Inter,Segoe UI,Arial,sans-serif;fill:#cbd5e1;font-size:15px}
+      .tiny{font-family:Inter,Segoe UI,Arial,sans-serif;fill:#94a3b8;font-size:13px}
+      .line{stroke:#64748b;stroke-width:3;fill:none;marker-end:url(#arrow)}
+    </style>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#64748b"/>
+    </marker>
+  </defs>
+  <rect class="bg" width="1200" height="760"/>
+  <text x="48" y="54" class="text" font-size="30">BrandQuest Architecture</text>
+  <text x="48" y="84" class="small">Playable ad campaigns on Vercel with all persistence in one DynamoDB table</text>
+
+  <rect class="panel" x="48" y="132" width="220" height="88" rx="14"/>
+  <text x="78" y="168" class="text">Players</text>
+  <text x="78" y="195" class="small">Play games, submit scores</text>
+
+  <rect class="panel" x="48" y="252" width="220" height="88" rx="14"/>
+  <text x="78" y="288" class="text">Creators</text>
+  <text x="78" y="315" class="small">Create campaigns, view analytics</text>
+
+  <rect class="panel" x="48" y="372" width="220" height="88" rx="14"/>
+  <text x="78" y="408" class="text">Admins</text>
+  <text x="78" y="435" class="small">Review custom games</text>
+
+  <rect class="accent" x="370" y="132" width="300" height="130" rx="16"/>
+  <text x="410" y="174" class="text">Vercel + Next.js</text>
+  <text x="410" y="205" class="small">App Router pages</text>
+  <text x="410" y="230" class="small">Server Components + client games</text>
+
+  <rect class="purple" x="370" y="302" width="300" height="116" rx="16"/>
+  <text x="410" y="344" class="text">Auth Layer</text>
+  <text x="410" y="375" class="small">Auth.js, Google OAuth</text>
+  <text x="410" y="400" class="small">Admin credentials provider</text>
+
+  <rect class="panel" x="370" y="470" width="300" height="170" rx="16"/>
+  <text x="410" y="512" class="text">Server Actions + API Routes</text>
+  <text x="410" y="544" class="small">Campaign creation</text>
+  <text x="410" y="569" class="small">Attempt submission</text>
+  <text x="410" y="594" class="small">Leaderboard reads</text>
+  <text x="410" y="619" class="small">Analytics events</text>
+
+  <rect class="warn" x="760" y="230" width="280" height="150" rx="16"/>
+  <text x="800" y="272" class="text">Validation Layer</text>
+  <text x="800" y="304" class="small">Zod input validation</text>
+  <text x="800" y="329" class="small">Server-side score checks</text>
+  <text x="800" y="354" class="small">Ownership and admin checks</text>
+
+  <rect class="green" x="760" y="450" width="350" height="190" rx="18"/>
+  <text x="800" y="492" class="text">Amazon DynamoDB</text>
+  <text x="800" y="524" class="small">Table: BrandQuest</text>
+  <text x="800" y="549" class="small">pk + sk single-table model</text>
+  <text x="800" y="582" class="tiny">Campaigns, users, attempts, leaderboards,</text>
+  <text x="800" y="604" class="tiny">analytics events, rewards, custom review records</text>
+
+  <path class="line" d="M268 176 H370"/>
+  <path class="line" d="M268 296 H370"/>
+  <path class="line" d="M268 416 H370"/>
+  <path class="line" d="M670 198 H760 V260"/>
+  <path class="line" d="M670 360 H760 V305"/>
+  <path class="line" d="M670 555 H760 V525"/>
+  <path class="line" d="M900 380 V450"/>
+
+  <rect class="panel" x="760" y="116" width="350" height="64" rx="14"/>
+  <text x="800" y="154" class="small">No client-side AWS access. No uploaded JS execution.</text>
+</svg>

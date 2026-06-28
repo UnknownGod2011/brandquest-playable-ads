@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="560" viewBox="0 0 1200 560" role="img" aria-labelledby="title desc">
+  <title id="title">BrandQuest custom game safety flow</title>
+  <desc id="desc">Creators upload metadata JSON, Zod validates it, admins approve or reject it, and approvals map only to trusted first-party runtimes.</desc>
+  <defs>
+    <style>
+      .bg{fill:#07111f}
+      .box{fill:#0e1729;stroke:#475569;stroke-width:2}
+      .green{fill:#064e3b;stroke:#34d399;stroke-width:2}
+      .red{fill:#7f1d1d;stroke:#f87171;stroke-width:2}
+      .gold{fill:#713f12;stroke:#facc15;stroke-width:2}
+      .text{font-family:Inter,Segoe UI,Arial,sans-serif;fill:#e5e7eb;font-size:20px;font-weight:700}
+      .small{font-family:Inter,Segoe UI,Arial,sans-serif;fill:#cbd5e1;font-size:14px}
+      .line{stroke:#64748b;stroke-width:3;fill:none;marker-end:url(#arrow)}
+    </style>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#64748b"/>
+    </marker>
+  </defs>
+  <rect class="bg" width="1200" height="560"/>
+  <text x="50" y="54" class="text" font-size="30">Custom Game Safety Flow</text>
+  <text x="50" y="84" class="small">Uploaded JSON is metadata only. BrandQuest never executes uploaded JavaScript.</text>
+
+  <rect class="box" x="50" y="150" width="220" height="90" rx="14"/>
+  <text x="78" y="187" class="text">Creator Upload</text>
+  <text x="78" y="214" class="small">Metadata JSON only</text>
+
+  <rect class="gold" x="330" y="150" width="220" height="90" rx="14"/>
+  <text x="360" y="187" class="text">Zod Validation</text>
+  <text x="360" y="214" class="small">No scripts, safe URLs</text>
+
+  <rect class="box" x="610" y="150" width="220" height="90" rx="14"/>
+  <text x="646" y="187" class="text">Pending Review</text>
+  <text x="646" y="214" class="small">Stored in DynamoDB</text>
+
+  <rect class="green" x="890" y="95" width="230" height="90" rx="14"/>
+  <text x="926" y="132" class="text">Approve</text>
+  <text x="926" y="159" class="small">Maps to Beat Tiles runtime</text>
+
+  <rect class="red" x="890" y="235" width="230" height="90" rx="14"/>
+  <text x="926" y="272" class="text">Reject</text>
+  <text x="926" y="299" class="small">Reason visible to creator</text>
+
+  <rect class="green" x="610" y="390" width="250" height="90" rx="14"/>
+  <text x="640" y="427" class="text">First-party Runtime</text>
+  <text x="640" y="454" class="small">Beat Tiles / Brand Rush Runner</text>
+
+  <rect class="box" x="930" y="390" width="220" height="90" rx="14"/>
+  <text x="960" y="427" class="text">Player Campaign</text>
+  <text x="960" y="454" class="small">Secure score API only</text>
+
+  <path class="line" d="M270 195 H330"/>
+  <path class="line" d="M550 195 H610"/>
+  <path class="line" d="M830 180 L890 140"/>
+  <path class="line" d="M830 210 L890 280"/>
+  <path class="line" d="M1005 185 V435 H860"/>
+  <path class="line" d="M860 435 H930"/>
+</svg>

@@ -174,6 +174,22 @@ export function CampaignBuilder() {
             if (!template?.playable) return
             update("templateType", type)
             update("isCustom", false)
+            if (type === "beat_tiles") {
+              updateConfig({
+                timeLimitSeconds: 45,
+                scoringRule: "combo",
+                maxPossibleScore: 15000,
+                beatTilesDurationSeconds: 45,
+                beatTilesSpawnMs: 650,
+                beatTilesPerfectWindow: 0.07,
+                beatTilesGreatWindow: 0.16,
+                primaryMetric: "score",
+                sortDirection: "desc",
+                tieBreakers: ["accuracy", "combo", "submittedAt"],
+                minDurationSeconds: 5,
+                maxScorePerSecond: 350,
+              })
+            }
           }}
         />
       )}
@@ -668,7 +684,45 @@ function GameSetupStep({
         </div>
       )}
 
-      {!["brand_quiz", "memory_match", "reaction_tap"].includes(form.templateType) && (
+      {form.templateType === "beat_tiles" && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <Label htmlFor="beatDuration">Beat Tiles duration</Label>
+            <Input
+              id="beatDuration"
+              type="number"
+              min={15}
+              max={120}
+              value={cfg.beatTilesDurationSeconds ?? cfg.timeLimitSeconds ?? 45}
+              onChange={(e) =>
+                updateConfig({
+                  beatTilesDurationSeconds: Number(e.target.value),
+                  timeLimitSeconds: Number(e.target.value),
+                })
+              }
+            />
+          </div>
+          <div>
+            <Label htmlFor="beatMax">Max possible score</Label>
+            <Input
+              id="beatMax"
+              type="number"
+              value={cfg.maxPossibleScore ?? 15000}
+              onChange={(e) =>
+                updateConfig({
+                  maxPossibleScore: Number(e.target.value),
+                  maxScorePerSecond: Math.max(1, Math.ceil(Number(e.target.value) / Math.max(1, cfg.beatTilesDurationSeconds ?? 45))),
+                })
+              }
+            />
+          </div>
+          <p className="sm:col-span-2 text-xs text-muted-foreground">
+            Beat Tiles leaderboards rank by score, then accuracy, max combo, and earliest submission.
+          </p>
+        </div>
+      )}
+
+      {!["brand_quiz", "memory_match", "reaction_tap", "beat_tiles"].includes(form.templateType) && (
         <div>
           <Label htmlFor="maxScore">Max possible score</Label>
           <Input

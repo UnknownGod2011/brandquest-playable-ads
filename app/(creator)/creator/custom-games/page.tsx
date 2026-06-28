@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import Link from "next/link"
-import { ArrowLeft, Sparkles } from "lucide-react"
+import { ArrowLeft, ExternalLink, Sparkles } from "lucide-react"
 import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/auth/current-user"
 import { Card } from "@/components/ui/card"
@@ -63,6 +63,22 @@ export default async function CustomGamesPage() {
                   <p className="text-xs text-muted-foreground">
                     Submitted {formatDate(s.submittedAt)}
                   </p>
+                  <p className="text-xs text-muted-foreground">
+                    {s.status === "pending"
+                      ? "Status: pending_review - waiting for admin review."
+                      : s.status === "approved"
+                        ? "Status: approved - safe first-party campaign created."
+                        : "Status: rejected - see reviewer notes below."}
+                  </p>
+                  {s.status === "approved" && s.approvedCampaignId ? (
+                    <Link
+                      href={`/player/games/${s.approvedCampaignId}`}
+                      className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline"
+                    >
+                      <ExternalLink className="size-3" aria-hidden="true" />
+                      View playable campaign
+                    </Link>
+                  ) : null}
                   {s.reviewNotes.length > 0 ? (
                     <div className="mt-1 space-y-1 border-t border-border/40 pt-2">
                       {s.reviewNotes.map((n) => (

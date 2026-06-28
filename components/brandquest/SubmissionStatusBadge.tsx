@@ -6,7 +6,7 @@ const meta: Record<
   CustomGameReviewStatus,
   { label: string; icon: typeof Clock; variant: "secondary" | "destructive" | "outline" }
 > = {
-  pending: { label: "Pending review", icon: Clock, variant: "outline" },
+  pending: { label: "pending_review", icon: Clock, variant: "outline" },
   approved: { label: "Approved", icon: CheckCircle2, variant: "secondary" },
   rejected: { label: "Rejected", icon: XCircle, variant: "destructive" },
 }

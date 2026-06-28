@@ -4,7 +4,12 @@ import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { ShieldCheck, Sparkles, Upload } from "lucide-react"
 import { toast } from "sonner"
-import type { CampaignCategory, ScoringType } from "@/lib/db/types"
+import type {
+  CampaignCategory,
+  LeaderboardMetric,
+  ScoringType,
+  SortDirection,
+} from "@/lib/db/types"
 import { campaignCategories } from "@/lib/validation/campaign"
 import { customGameSubmissionSchema } from "@/lib/validation/custom-game"
 import { Button } from "@/components/ui/button"
@@ -23,6 +28,13 @@ import {
 import { submitCustomGame } from "@/lib/campaigns/actions"
 
 const scoringMethods: ScoringType[] = ["points", "time", "accuracy", "combo"]
+const leaderboardMetrics: LeaderboardMetric[] = [
+  "score",
+  "accuracy",
+  "completionTime",
+  "combo",
+  "submittedAt",
+]
 
 interface FormState {
   gameTitle: string
@@ -40,6 +52,10 @@ interface FormState {
   rewardValue: number
   externalDemoUrl: string
   securityNotes: string
+  desiredGameStyle: string
+  primaryMetric: LeaderboardMetric
+  sortDirection: SortDirection
+  tieBreakers: LeaderboardMetric[]
 }
 
 const initial: FormState = {
@@ -58,6 +74,10 @@ const initial: FormState = {
   rewardValue: 0,
   externalDemoUrl: "",
   securityNotes: "",
+  desiredGameStyle: "Beat Tiles",
+  primaryMetric: "score",
+  sortDirection: "desc",
+  tieBreakers: ["accuracy", "combo", "submittedAt"],
 }
 
 function FieldError({ errors }: { errors?: string[] }) {
@@ -103,6 +123,10 @@ export function CustomGameForm() {
         data.securityNotes,
         form.securityNotes || "Metadata-only submission. No uploaded JavaScript or executable code is included.",
       ),
+      desiredGameStyle: textValue(data.desiredGameStyle, form.desiredGameStyle),
+      primaryMetric: metricValue(data.primaryMetric, form.primaryMetric),
+      sortDirection: sortDirectionValue(data.sortDirection, form.sortDirection),
+      tieBreakers: metricArrayValue(data.tieBreakers, form.tieBreakers),
     }
     const parsed = customGameSubmissionSchema.safeParse(nextForm)
     if (!parsed.success) {
@@ -184,7 +208,7 @@ export function CustomGameForm() {
             }}
           />
           <span className="text-xs text-muted-foreground">
-            Upload `spotify-vibe-rush-custom-game.json` or paste it below.
+            Upload `spotify-beat-tiles-custom-game.json` or paste it below.
           </span>
         </div>
         <Textarea
@@ -283,6 +307,17 @@ export function CustomGameForm() {
         </div>
 
         <div>
+          <Label htmlFor="style">Desired game style</Label>
+          <Input
+            id="style"
+            value={form.desiredGameStyle}
+            onChange={(e) => update("desiredGameStyle", e.target.value)}
+            placeholder="Beat Tiles"
+          />
+          <FieldError errors={errors.desiredGameStyle} />
+        </div>
+
+        <div>
           <Label>Scoring method</Label>
           <Select
             value={form.scoringMethod}
@@ -297,6 +332,43 @@ export function CustomGameForm() {
                   {m.charAt(0).toUpperCase() + m.slice(1)}
                 </SelectItem>
               ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label>Primary leaderboard metric</Label>
+          <Select
+            value={form.primaryMetric}
+            onValueChange={(v) =>
+              update("primaryMetric", (v ?? "score") as LeaderboardMetric)
+            }
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {leaderboardMetrics.map((m) => (
+                <SelectItem key={m} value={m}>
+                  {m}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label>Sort direction</Label>
+          <Select
+            value={form.sortDirection}
+            onValueChange={(v) =>
+              update("sortDirection", (v ?? "desc") as SortDirection)
+            }
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="desc">High to low</SelectItem>
+              <SelectItem value="asc">Low to high</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -419,7 +491,32 @@ function categoryValue(value: unknown, fallback: CampaignCategory): CampaignCate
 }
 
 function scoringValue(value: unknown, fallback: ScoringType): ScoringType {
+  if (value === "accuracy_combo") return "combo"
   return typeof value === "string" && scoringMethods.includes(value as ScoringType)
     ? (value as ScoringType)
     : fallback
+}
+
+function metricValue(value: unknown, fallback: LeaderboardMetric): LeaderboardMetric {
+  if (value === "maxCombo") return "combo"
+  if (value === "durationMs") return "completionTime"
+  return typeof value === "string" && leaderboardMetrics.includes(value as LeaderboardMetric)
+    ? (value as LeaderboardMetric)
+    : fallback
+}
+
+function sortDirectionValue(value: unknown, fallback: SortDirection): SortDirection {
+  return value === "asc" || value === "desc" ? value : fallback
+}
+
+function metricArrayValue(
+  value: unknown,
+  fallback: LeaderboardMetric[],
+): LeaderboardMetric[] {
+  if (!Array.isArray(value)) return fallback
+  const metrics = value
+    .map((item) => metricValue(item, "score"))
+    .filter((metric, index, list) => list.indexOf(metric) === index)
+    .slice(0, 4)
+  return metrics.length ? metrics : fallback
 }
