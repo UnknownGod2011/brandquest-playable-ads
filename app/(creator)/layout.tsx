@@ -7,8 +7,8 @@ export default async function CreatorLayout({
 }: {
   children: React.ReactNode
 }) {
-  const user = await getCurrentUser()
-  if (!user) redirect("/role?role=creator")
+  const user = await getCurrentUser("creator")
+  if (!user) redirect("/signin?role=creator")
   if (user.role !== "creator") redirect("/role")
 
   return (

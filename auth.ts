@@ -87,5 +87,6 @@ export const {
   providers,
   pages: {
     signIn: "/signin",
+    error: "/signin",
   },
 })

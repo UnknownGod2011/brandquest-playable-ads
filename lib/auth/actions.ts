@@ -34,7 +34,7 @@ export async function chooseRole(formData: FormData): Promise<void> {
 export async function startGoogleSignIn(formData: FormData): Promise<void> {
   const role = parseRole(formData.get("role"))
   await setRoleCookie(role)
-  await authSignIn("google", { redirectTo: "/auth/complete" })
+  await authSignIn("google", { redirectTo: `/auth/complete?role=${role}` })
 }
 
 export async function startAdminSignIn(formData: FormData): Promise<void> {

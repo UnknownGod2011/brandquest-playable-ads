@@ -16,11 +16,14 @@ function stableUserId(email: string): string {
   return `user_${createHash("sha256").update(email.toLowerCase()).digest("hex").slice(0, 24)}`
 }
 
-export async function getCurrentUser(): Promise<User | null> {
+export async function getCurrentUser(roleHint?: UserRole): Promise<User | null> {
   const session = await auth()
   const email = session?.user?.email
   const store = await cookies()
-  const role = parseRole(store.get(AUTH_COOKIE)?.value)
+  const cookieRole = parseRole(store.get(AUTH_COOKIE)?.value)
+  const hintedRole =
+    roleHint && roleHint !== "admin" ? parseRole(roleHint) : null
+  const role = cookieRole ?? hintedRole
 
   if (email) {
     const user = await db.getUserByEmail(email)

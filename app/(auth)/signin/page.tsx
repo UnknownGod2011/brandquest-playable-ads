@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import Link from "next/link"
+import { cookies } from "next/headers"
 import { Info } from "lucide-react"
 import type { UserRole } from "@/lib/db/types"
 import { Button } from "@/components/ui/button"
@@ -7,7 +8,7 @@ import { Card } from "@/components/ui/card"
 import { Logo } from "@/components/brandquest/Logo"
 import { AdminCredentialsForm } from "@/components/brandquest/AdminCredentialsForm"
 import { startGoogleSignIn } from "@/lib/auth/actions"
-import { getAuthStatus } from "@/lib/auth/auth.config"
+import { AUTH_COOKIE, getAuthStatus } from "@/lib/auth/auth.config"
 
 export const metadata: Metadata = {
   title: "Sign in - BrandQuest",
@@ -15,17 +16,40 @@ export const metadata: Metadata = {
 
 const VALID: UserRole[] = ["player", "creator", "admin"]
 
+function parseRole(value: string | undefined): UserRole | null {
+  return VALID.includes(value as UserRole) ? (value as UserRole) : null
+}
+
+function authErrorMessage(error: string | undefined): string | null {
+  if (!error) return null
+  if (
+    error === "AccessDenied" ||
+    error === "OAuthCallback" ||
+    error === "OAuthCallbackError" ||
+    error === "CallbackRouteError" ||
+    error === "OAuthCancelled" ||
+    error.toLowerCase().includes("access_denied")
+  ) {
+    return "Sign-in was cancelled. Please try again."
+  }
+  if (error === "CredentialsSignin") {
+    return "Admin credentials were not accepted."
+  }
+  return "We could not complete sign-in. Please try again."
+}
+
 export default async function SignInPage({
   searchParams,
 }: {
-  searchParams: Promise<{ role?: string }>
+  searchParams: Promise<{ role?: string; error?: string }>
 }) {
-  const { role } = await searchParams
-  const safeRole: UserRole = VALID.includes(role as UserRole)
-    ? (role as UserRole)
-    : "player"
+  const { role, error } = await searchParams
+  const store = await cookies()
+  const cookieRole = parseRole(store.get(AUTH_COOKIE)?.value)
+  const safeRole: UserRole = parseRole(role) ?? cookieRole ?? "player"
   const auth = getAuthStatus()
   const isAdmin = safeRole === "admin"
+  const message = authErrorMessage(error)
 
   return (
     <main className="relative flex min-h-dvh flex-col items-center justify-center px-4 py-12">
@@ -42,6 +66,13 @@ export default async function SignInPage({
         </div>
 
         <Card className="p-6">
+          {message ? (
+            <div className="mb-4 flex gap-2 rounded-lg bg-muted/60 p-3 text-xs leading-relaxed text-muted-foreground">
+              <Info className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden="true" />
+              <span>{message}</span>
+            </div>
+          ) : null}
+
           {isAdmin ? (
             <AdminCredentialsForm
               enabled={auth.secretConfigured && auth.adminCredentialsConfigured}

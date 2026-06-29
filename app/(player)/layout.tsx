@@ -7,8 +7,8 @@ export default async function PlayerLayout({
 }: {
   children: React.ReactNode
 }) {
-  const user = await getCurrentUser()
-  if (!user) redirect("/role?role=player")
+  const user = await getCurrentUser("player")
+  if (!user) redirect("/signin?role=player")
   if (user.role !== "player") redirect("/role")
 
   return (
